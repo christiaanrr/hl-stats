@@ -50,6 +50,17 @@ button:disabled{opacity:.5;cursor:default}
 .chart{width:100%;position:relative}
 .chart svg{display:block;width:100%;overflow:visible}
 .chart text{font:11px system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--muted)}
+.months{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px 22px}
+.month h3{font-size:13px;font-weight:600;margin:0 0 6px;display:flex;justify-content:space-between;align-items:baseline}
+.month h3 span{font-weight:600;font-size:12px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.dow{font-size:10px;color:var(--muted);text-align:center;padding-bottom:2px}
+.day{aspect-ratio:1;border-radius:5px;background:var(--surface-2);position:relative;font-size:10px;color:var(--muted);padding:3px 4px;min-width:0;overflow:hidden}
+.day.has{color:var(--ink);cursor:default}
+.day .n{position:absolute;top:2px;left:4px;opacity:.75}
+.day .v{position:absolute;bottom:3px;left:0;right:0;text-align:center;font-weight:600;font-size:10px;white-space:nowrap;letter-spacing:-.02em}
+.day.blank{background:transparent}
+.day.future{opacity:.35}
 .tbl{width:100%;overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
 th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
@@ -105,11 +116,7 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 
   <section class="grid tiles" id="tiles"></section>
 
-  <section class="grid two">
-    <div class="card">
-      <h2>Realized PnL <small>cumulative in range, net of fees</small></h2>
-      <div class="chart" id="equity"></div>
-    </div>
+  <section class="grid">
     <div class="card">
       <h2>Total PnL <small>realized + unrealized, excludes deposits and withdrawals</small></h2>
       <div class="chart" id="acct"></div>
@@ -118,8 +125,8 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 
   <section class="grid">
     <div class="card">
-      <h2>Daily realized PnL <small id="daily-sub">net of fees</small></h2>
-      <div class="chart" id="daily"></div>
+      <h2>PnL calendar <small id="cal-sub">closed trades per day, net of fees</small></h2>
+      <div id="calendar"></div>
     </div>
   </section>
 
@@ -385,36 +392,42 @@ function lineChart(container, series, tEnd = Date.now(), tStart = Infinity) {
   hit.addEventListener('mouseleave', () => { cross.setAttribute('opacity', 0); dots.forEach(d => d.setAttribute('opacity', 0)); hideTip(); });
 }
 
-function dailyBars(container, dailyMap, from, to) {
-  const f = frame(container, 220, {l: 56, r: 12, t: 12, b: 26});
-  const start = new Date(from); start.setHours(0, 0, 0, 0);
-  const end = new Date(to); end.setHours(0, 0, 0, 0);
-  const nDays = Math.round((end - start) / 864e5) + 1;
-  const weekly = nDays > 120;
-  const rows = [];
-  if (weekly) { const d = new Date(start); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); while (d <= end) { rows.push({t: d.getTime(), v: 0, has: false, wk: true}); d.setDate(d.getDate() + 7); } for (const k in dailyMap) { const t = new Date(k + 'T00:00').getTime(); const i = Math.floor((t - rows[0].t) / (7 * 864e5)); if (rows[i]) { rows[i].v += dailyMap[k]; rows[i].has = true; } } }
-  else for (let i = 0; i < nDays; i++) { const d = new Date(start); d.setDate(d.getDate() + i); const k = dayKey(d); rows.push({k, t: d.getTime(), v: dailyMap[k] || 0, has: k in dailyMap}); }
-  const days = rows.length;
-  const vals = rows.map(r => r.v); let vMin = Math.min(0, ...vals), vMax = Math.max(0, ...vals);
-  if (vMin === 0 && vMax === 0) vMax = 1;
-  const ticks = niceTicks(vMin, vMax, 4); vMin = Math.min(vMin, ticks[0]); vMax = Math.max(vMax, ticks[ticks.length - 1]);
-  const Y = v => f.y1 - (v - vMin) / (vMax - vMin) * (f.y1 - f.y0);
-  yAxis(f, ticks, Y);
-  const slot = (f.x1 - f.x0) / days, bw = Math.min(24, Math.max(2, slot - 2));
-  rows.forEach((r, i) => {
-    const x = f.x0 + i * slot + (slot - bw) / 2, y0 = Y(0), y = Y(r.v), h = Math.abs(y - y0);
-    const top = Math.min(y, y0), rad = Math.min(4, bw / 2, h);
-    const up = r.v >= 0;
-    const d = h < .5 ? '' : up
-      ? `M${x},${y0}V${top + rad}Q${x},${top} ${x + rad},${top}H${x + bw - rad}Q${x + bw},${top} ${x + bw},${top + rad}V${y0}Z`
-      : `M${x},${y0}V${y0 + h - rad}Q${x},${y0 + h} ${x + rad},${y0 + h}H${x + bw - rad}Q${x + bw},${y0 + h} ${x + bw},${y0 + h - rad}V${y0}Z`;
-    if (d) S('path', {d, fill: up ? 'var(--good)' : 'var(--bad)'}, f.svg);
-    const hit = S('rect', {x: f.x0 + i * slot, y: f.y0, width: slot, height: f.y1 - f.y0, fill: 'transparent'}, f.svg);
-    hit.addEventListener('mousemove', e => showTip(`<b>${r.wk ? 'Week of ' : ''}${fmtDate(r.t)}</b><br>${!r.has ? 'No closed trades' : fmtUsd(r.v, {sign: true})}`, e));
-    hit.addEventListener('mouseleave', hideTip);
+const cellVal = v => (v < 0 ? '−' : '+') + (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(1) + 'K' : Math.round(Math.abs(v)));
+function calendar(container, trades, from, to) {
+  // A day's PnL is the net of trades that CLOSED that day (journal convention), so opening a position never colours a day.
+  const byDay = {}, dailyMap = {};
+  for (const t of trades) { const k = dayKey(t.close); (byDay[k] ||= []).push(t); dailyMap[k] = (dailyMap[k] || 0) + t.net; }
+  const first = new Date(from); first.setDate(1); first.setHours(0, 0, 0, 0);
+  const last = new Date(to); last.setHours(0, 0, 0, 0);
+  const today = startOfDay(Date.now());
+  const maxAbs = Math.max(1, ...Object.values(dailyMap).map(Math.abs));
+  const months = [];
+  for (let m = new Date(first); m <= last; m.setMonth(m.getMonth() + 1)) {
+    const y = m.getFullYear(), mo = m.getMonth(), nDays = new Date(y, mo + 1, 0).getDate();
+    const offset = (new Date(y, mo, 1).getDay() + 6) % 7;   // Monday first
+    const prefix = `${y}-${String(mo + 1).padStart(2, '0')}`;
+    if (!Object.keys(dailyMap).some(k => k.startsWith(prefix))) continue;   // skip months with no closed trades
+    let total = 0, cells = '';
+    for (let i = 0; i < offset; i++) cells += '<div class="day blank"></div>';
+    for (let d = 1; d <= nDays; d++) {
+      const date = new Date(y, mo, d), k = dayKey(date), t = date.getTime();
+      const v = dailyMap[k], has = k in dailyMap, inRange = t >= startOfDay(from) - 1 && t <= to;
+      if (has) total += v;
+      const alpha = has ? 0.15 + 0.6 * Math.min(1, Math.abs(v) / maxAbs) : 0;
+      const bg = has ? (v >= 0 ? `rgba(12,163,12,${alpha.toFixed(2)})` : `rgba(208,59,59,${alpha.toFixed(2)})`) : '';
+      cells += `<div class="day${has ? ' has' : ''}${t > today ? ' future' : ''}" data-k="${k}"${bg ? ` style="background:${bg}"` : ''}${!inRange ? ' style="opacity:.25"' : ''}><span class="n">${d}</span>${has ? `<span class="v">${cellVal(v)}</span>` : ''}</div>`;
+    }
+    months.push(`<div class="month"><h3>${m.toLocaleDateString('en-US', {month: 'long', year: 'numeric'})}<span class="${cls(total)}">${fmtUsd(total, {sign: true, dec: 0})}</span></h3><div class="days">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div></div>`);
+  }
+  container.innerHTML = months.length ? `<div class="months">${months.join('')}</div>` : '<div class="empty">No closed trades in this range.</div>';
+  container.querySelectorAll('.day.has').forEach(el => {
+    el.addEventListener('mousemove', e => {
+      const k = el.dataset.k, list = byDay[k] || [];
+      const rows = list.sort((a, b) => b.net - a.net).slice(0, 8).map(t => `${t.coin} ${t.dir === 'long' ? 'L' : 'S'}: ${fmtUsd(t.net, {sign: true})}`).join('<br>');
+      showTip(`<b>${new Date(k + 'T00:00').toLocaleDateString('en-US', {weekday: 'short', month: 'short', day: 'numeric'})}</b> · ${fmtUsd(dailyMap[k], {sign: true})}<br>${list.length} closed trade${list.length === 1 ? '' : 's'}${rows ? '<br>' + rows : ''}${list.length > 8 ? '<br>…' : ''}`, e);
+    });
+    el.addEventListener('mouseleave', hideTip);
   });
-  const nLab = Math.max(1, Math.min(5, Math.floor((f.x1 - f.x0) / 80), days - 1));
-  for (let i = 0; i <= nLab; i++) { const idx = Math.round((days - 1) * i / nLab); const el = S('text', {x: f.x0 + idx * slot + slot / 2, y: f.H - 8, 'text-anchor': i === 0 ? 'start' : i === nLab ? 'end' : 'middle'}, f.svg); el.textContent = fmtDate(rows[idx].t); }
 }
 
 function hBars(container, rows) {
@@ -522,14 +535,13 @@ function render() {
   const base = anchor ? anchor.v : 0;
   const pnlHist = pnlAll.filter(pt => pt.t >= rb.from && pt.t <= rb.to).map(pt => ({t: pt.t, v: pt.v - base}));
   if (anchor) pnlHist.unshift({t: rb.from, v: 0});
-  const curve = isFinite(rb.from) && a.curve.length && a.curve[0].t > rb.from ? [{t: rb.from, v: 0}, ...a.curve] : a.curve;  // start flat at 0 from range start
-  lineChart($('#equity'), [{name: 'Realized PnL', color: 'var(--accent)', points: curve, step: true, fill: true}], rb.to, rb.from);
-  lineChart($('#acct'), [{name: 'Total PnL', color: '#52514e', points: pnlHist, fill: true}], rb.to, rb.from);
+  lineChart($('#acct'), [{name: 'Total PnL', color: 'var(--accent)', points: pnlHist, fill: true}], rb.to, rb.from);
   const firstFill = d.fills[0]?.time ?? Date.now();
   const dFrom = Math.max(rb.from, firstFill), dTo = Math.min(rb.to, Date.now());
-  const span = Math.round((startOfDay(dTo) - startOfDay(dFrom)) / 864e5) + 1;
-  $('#daily-sub').textContent = (span > 120 ? 'weekly, ' : '') + (RANGE.key === 'custom' ? rb.label : rb.label[0].toLowerCase() + rb.label.slice(1)) + ', net of fees';
-  dailyBars($('#daily'), a.daily, dFrom, dTo);
+  const dayNet = {}; for (const t of a.trades) { const k = dayKey(t.close); dayNet[k] = (dayNet[k] || 0) + t.net; }
+  const days = Object.keys(dayNet).length, greenDays = Object.values(dayNet).filter(v => v > 0).length;
+  $('#cal-sub').textContent = `${RANGE.key === 'custom' ? rb.label : rb.label[0].toLowerCase() + rb.label.slice(1)} · ${greenDays} of ${days} trading days positive · by trade close date, net of fees`;
+  calendar($('#calendar'), a.trades, dFrom, dTo);
 
   $('#tq-sub').textContent = `${a.count} closed trades${a.open.length ? `, ${a.open.length} open` : ''}`;
   const pf = a.profitFactor;
