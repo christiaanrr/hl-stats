@@ -339,7 +339,7 @@ function yAxis(f, ticks, scale) {
 function lineChart(container, series, tEnd = Date.now(), tStart = Infinity) {
   const all = series.flatMap(s => s.points);
   if (!all.length) { container.innerHTML = '<div class="empty">No history yet.</div>'; return; }
-  const f = frame(container, 260, {l: 56, r: 16, t: 12, b: 26});
+  const f = frame(container, 260, {l: 56, r: 68, t: 12, b: 26});   // right pad leaves room for the end-value label
   const tMin = Math.min(...all.map(p => p.t), isFinite(tStart) ? tStart : Infinity), tMax = Math.max(...all.map(p => p.t), Math.min(tEnd, Date.now()));
   let vMin = Math.min(0, ...all.map(p => p.v)), vMax = Math.max(0, ...all.map(p => p.v));
   const ticks = niceTicks(vMin, vMax, 5); vMin = Math.min(vMin, ticks[0]); vMax = Math.max(vMax, ticks[ticks.length - 1]);
@@ -356,18 +356,30 @@ function lineChart(container, series, tEnd = Date.now(), tStart = Infinity) {
     const last = s.points[s.points.length - 1]; d += `H${X(tMax).toFixed(1)}`;
     if (s.fill) S('path', {d: d + `V${Y(0)}H${X(s.points[0].t)}Z`, fill: s.color, opacity: .1}, f.svg);
     S('path', {d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, f.svg);
-    const dot = S('circle', {cx: X(tMax), cy: Y(last.v), r: 4, fill: s.color, stroke: 'var(--surface)', 'stroke-width': 2}, f.svg);
+    S('circle', {cx: X(tMax), cy: Y(last.v), r: 4, fill: s.color, stroke: 'var(--surface)', 'stroke-width': 2}, f.svg);
+    const endLabel = S('text', {x: X(tMax) + 9, y: Y(last.v) + 4, style: 'fill:var(--ink);font-weight:600'}, f.svg);
+    endLabel.textContent = fmtUsd(last.v, {sign: true, dec: 0});
   }
   // hover crosshair
   const cross = S('line', {y1: f.y0, y2: f.y1, stroke: 'var(--axis)', 'stroke-width': 1, opacity: 0}, f.svg);
   const dots = series.map(s => S('circle', {r: 5, fill: s.color, stroke: 'var(--surface)', 'stroke-width': 2, opacity: 0}, f.svg));
-  const hit = S('rect', {x: f.x0, y: f.y0, width: f.x1 - f.x0, height: f.y1 - f.y0, fill: 'transparent'}, f.svg);
-  const valueAt = (pts, t) => { let lo = 0, hi = pts.length - 1; if (t < pts[0].t) return null; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (pts[m].t <= t) lo = m; else hi = m - 1; } return pts[lo].v; };
+  // The hover target is the whole card so the first and last values are reachable; the cursor is clamped to the plot.
+  const hit = S('rect', {x: 0, y: 0, width: f.W, height: f.H, fill: 'transparent'}, f.svg);
+  const valueAt = (pts, t, step) => {
+    if (t < pts[0].t) return null;
+    let lo = 0, hi = pts.length - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (pts[m].t <= t) lo = m; else hi = m - 1; }
+    const a = pts[lo], b = pts[lo + 1];
+    if (step || !b || b.t === a.t) return a.v;                       // stepped series holds its value until the next point
+    return a.v + (b.v - a.v) * (t - a.t) / (b.t - a.t);              // smooth series is read off the drawn line
+  };
   hit.addEventListener('mousemove', e => {
-    const r = f.svg.getBoundingClientRect(), x = e.clientX - r.left, t = tMin + (x - f.x0) / (f.x1 - f.x0) * (tMax - tMin);
+    const r = f.svg.getBoundingClientRect();
+    const x = Math.max(f.x0, Math.min(f.x1, (e.clientX - r.left) * (f.W / r.width)));
+    const t = tMin + (x - f.x0) / (f.x1 - f.x0) * (tMax - tMin);
     cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', 1);
     let html = `<b>${fmtDateTime(t)}</b>`;
-    series.forEach((s, i) => { const v = valueAt(s.points, t); if (v == null) { dots[i].setAttribute('opacity', 0); return; } dots[i].setAttribute('cx', x); dots[i].setAttribute('cy', Y(v)); dots[i].setAttribute('opacity', 1); html += `<br>${s.name}: ${fmtUsd(v)}`; });
+    series.forEach((s, i) => { const v = valueAt(s.points, t, s.step); if (v == null) { dots[i].setAttribute('opacity', 0); return; } dots[i].setAttribute('cx', x); dots[i].setAttribute('cy', Y(v)); dots[i].setAttribute('opacity', 1); html += `<br>${s.name}: ${fmtUsd(v)}`; });
     showTip(html, e);
   });
   hit.addEventListener('mouseleave', () => { cross.setAttribute('opacity', 0); dots.forEach(d => d.setAttribute('opacity', 0)); hideTip(); });
