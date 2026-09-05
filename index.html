@@ -88,6 +88,8 @@ td.coin{font-weight:600}
 .seg button{border:0;background:transparent;padding:5px 11px;border-radius:6px;font-size:13px;color:var(--ink-2)}
 .seg button:hover{background:var(--surface-2);color:var(--ink)}
 .seg button.on{background:var(--ink);color:#fff}
+.seg button.since{color:var(--muted);font-size:12px;border-left:1px solid var(--grid);border-radius:0 6px 6px 0;margin-left:2px}
+.seg button.since.on{color:#fff}
 .range{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2)}
 .range input{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 6px}
 .range-sum{margin-left:auto;font-size:13px;color:var(--ink-2)}
@@ -110,7 +112,7 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 
   <div class="filters" id="filters">
     <div class="seg" id="presets">
-      <button data-r="7">7D</button><button data-r="30">30D</button><button data-r="90">90D</button><button data-r="ytd">YTD</button><button data-r="all">All time</button>
+      <button data-r="7">7D</button><button data-r="30">30D</button><button data-r="90">90D</button><button data-r="ytd">YTD</button><button data-r="all">All time</button><button data-r="since" class="since" id="since-btn" hidden></button>
     </div>
     <label class="range">From <input type="date" id="from"></label>
     <label class="range">To <input type="date" id="to"></label>
@@ -183,6 +185,7 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 <script>
 /* ---------- config ---------- */
 // No wallet is hardcoded: pass ?user=0x… in the URL. The last address used is remembered in this browser only.
+const SINCE = '2026-08-26';   // optional quick filter for "since I started my current strategy"; set to '' to hide the button
 const API = 'https://api.hyperliquid.xyz/info';
 const qsUser = new URLSearchParams(location.search).get('user');
 let remembered = ''; try { remembered = localStorage.getItem('hl-user') || ''; } catch {}
@@ -484,6 +487,7 @@ function rangeBounds() {
   const now = Date.now(), today = startOfDay(now);
   if (RANGE.key === 'all') return {from: -Infinity, to: Infinity, label: 'All time'};
   if (RANGE.key === 'ytd') return {from: new Date(new Date().getFullYear(), 0, 1).getTime(), to: Infinity, label: 'Year to date'};
+  if (RANGE.key === 'since' && SINCE) { const from = new Date(SINCE + 'T00:00').getTime(); return {from, to: Infinity, label: `Since ${fmtDate(from)}`}; }
   if (RANGE.key === 'custom') {
     const from = RANGE.from ? new Date(RANGE.from + 'T00:00').getTime() : -Infinity;
     const to = RANGE.to ? new Date(RANGE.to + 'T00:00').getTime() + 864e5 - 1 : Infinity;
@@ -496,6 +500,7 @@ function syncFilters() {
   $('#presets').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.r === RANGE.key));
   $('#from').value = RANGE.key === 'custom' ? RANGE.from : ''; $('#to').value = RANGE.key === 'custom' ? RANGE.to : '';
 }
+if (SINCE) { const b = $('#since-btn'); b.hidden = false; b.textContent = 'Since ' + fmtDate(new Date(SINCE + 'T00:00').getTime()); b.title = 'From ' + SINCE; }
 $('#presets').onclick = e => { const b = e.target.closest('button'); if (b) setRange({key: b.dataset.r, from: '', to: ''}); };
 const onCustom = () => { let from = $('#from').value, to = $('#to').value; if (!from && !to) return setRange({key: 'all', from: '', to: ''}); if (from && to && from > to) [from, to] = [to, from]; setRange({key: 'custom', from, to}); };
 $('#from').onchange = onCustom; $('#to').onchange = onCustom;
