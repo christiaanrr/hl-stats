@@ -22,6 +22,7 @@ h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em}
 .sub{color:var(--ink-2);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .addr{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--surface);border:1px solid var(--border);padding:3px 8px;border-radius:6px}
 .badge{font-size:11px;padding:2px 7px;border-radius:999px;background:var(--surface-2);color:var(--ink-2)}
+.card h2 .badge{margin-left:6px;font-weight:500}
 button{font:inherit;background:var(--surface);border:1px solid var(--border);color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer}
 button:hover{background:var(--surface-2)}
 button:disabled{opacity:.5;cursor:default}
@@ -50,7 +51,9 @@ button:disabled{opacity:.5;cursor:default}
 .chart{width:100%;position:relative}
 .chart svg{display:block;width:100%;overflow:visible}
 .chart text{font:11px system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--muted)}
-.months{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px 22px}
+.months{display:grid;grid-template-columns:repeat(3,1fr);gap:18px 26px}
+@media (max-width:900px){.months{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.months{grid-template-columns:1fr}}
 .month h3{font-size:13px;font-weight:600;margin:0 0 6px;display:flex;justify-content:space-between;align-items:baseline}
 .month h3 span{font-weight:600;font-size:12px}
 .days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
@@ -58,7 +61,7 @@ button:disabled{opacity:.5;cursor:default}
 .day{aspect-ratio:1;border-radius:5px;background:var(--surface-2);position:relative;font-size:10px;color:var(--muted);padding:3px 4px;min-width:0;overflow:hidden}
 .day.has{color:var(--ink);cursor:default}
 .day .n{position:absolute;top:2px;left:4px;opacity:.75}
-.day .v{position:absolute;bottom:3px;left:0;right:0;text-align:center;font-weight:600;font-size:10px;white-space:nowrap;letter-spacing:-.02em}
+.day .v{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-weight:600;font-size:11px;white-space:nowrap;letter-spacing:-.02em}
 .day.blank{background:transparent}
 .day.future{opacity:.35}
 .tbl{width:100%;overflow-x:auto}
@@ -125,7 +128,7 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 
   <section class="grid">
     <div class="card">
-      <h2>PnL calendar <small id="cal-sub">closed trades per day, net of fees</small></h2>
+      <h2><span>PnL calendar <span id="cal-month" class="badge"></span></span><small id="cal-sub">closed trades per day, net of fees</small></h2>
       <div id="calendar"></div>
     </div>
   </section>
@@ -419,6 +422,7 @@ function calendar(container, trades, from, to) {
     }
     months.push(`<div class="month"><h3>${m.toLocaleDateString('en-US', {month: 'long', year: 'numeric'})}<span class="${cls(total)}">${fmtUsd(total, {sign: true, dec: 0})}</span></h3><div class="days">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div></div>`);
   }
+  months.reverse();   // current month first
   container.innerHTML = months.length ? `<div class="months">${months.join('')}</div>` : '<div class="empty">No closed trades in this range.</div>';
   container.querySelectorAll('.day.has').forEach(el => {
     el.addEventListener('mousemove', e => {
@@ -539,6 +543,10 @@ function render() {
   const firstFill = d.fills[0]?.time ?? Date.now();
   const dFrom = Math.max(rb.from, firstFill), dTo = Math.min(rb.to, Date.now());
   const dayNet = {}; for (const t of a.trades) { const k = dayKey(t.close); dayNet[k] = (dayNet[k] || 0) + t.net; }
+  const nowD = new Date(), curPrefix = `${nowD.getFullYear()}-${String(nowD.getMonth() + 1).padStart(2, '0')}`;
+  const curTotal = Object.entries(dayNet).filter(([k]) => k.startsWith(curPrefix)).reduce((s, [, v]) => s + v, 0);
+  const curHas = Object.keys(dayNet).some(k => k.startsWith(curPrefix));
+  $('#cal-month').innerHTML = curHas ? `${nowD.toLocaleDateString('en-US', {month: 'long'})}: <span class="${cls(curTotal)}">${fmtUsd(curTotal, {sign: true, dec: 0})}</span>` : `${nowD.toLocaleDateString('en-US', {month: 'long'})}: no closed trades`;
   const days = Object.keys(dayNet).length, greenDays = Object.values(dayNet).filter(v => v > 0).length;
   $('#cal-sub').textContent = `${RANGE.key === 'custom' ? rb.label : rb.label[0].toLowerCase() + rb.label.slice(1)} · ${greenDays} of ${days} trading days positive · by trade close date, net of fees`;
   calendar($('#calendar'), a.trades, dFrom, dTo);
