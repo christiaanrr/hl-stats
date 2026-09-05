@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hyperliquid Stats</title>
+<style>
+:root{
+  color-scheme:light;
+  --page:#f4f4f1; --surface:#fcfcfb; --surface-2:#f1f1ee;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --good:#0ca30c; --good-text:#006300; --bad:#d03b3b; --bad-text:#a82c2c;
+  --accent:#2a78d6; --wash:rgba(42,120,214,.10);
+  --radius:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 20px 48px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em}
+.sub{color:var(--ink-2);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.addr{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--surface);border:1px solid var(--border);padding:3px 8px;border-radius:6px}
+.badge{font-size:11px;padding:2px 7px;border-radius:999px;background:var(--surface-2);color:var(--ink-2)}
+button{font:inherit;background:var(--surface);border:1px solid var(--border);color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer}
+button:hover{background:var(--surface-2)}
+button:disabled{opacity:.5;cursor:default}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;min-width:0}
+.card h2{font-size:13px;font-weight:600;color:var(--ink-2);margin:0 0 12px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card h2 small{font-weight:400;color:var(--muted);font-size:12px}
+.grid{display:grid;gap:14px;margin-bottom:14px}
+.tiles{grid-template-columns:repeat(4,1fr)}
+@media (max-width:900px){.tiles{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:480px){.tiles{grid-template-columns:1fr}}
+.tile .label{font-size:12px;color:var(--ink-2)}
+.tile .label em{font-style:normal;color:var(--muted)}
+.tile .value{font-size:24px;font-weight:600;margin:4px 0 2px;letter-spacing:-.01em}
+.tile .delta{font-size:12px;color:var(--muted)}
+.two{grid-template-columns:1fr 1fr}
+.two-eq{grid-template-columns:1fr 1fr}
+@media (max-width:820px){.two,.two-eq{grid-template-columns:1fr}}
+.pos{color:var(--good-text)} .neg{color:var(--bad-text)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 14px}
+@media (max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat .k{font-size:11px;color:var(--muted)}
+.stat .v{font-size:16px;font-weight:600;margin-top:1px}
+.stat .s{font-size:11px;color:var(--ink-2)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--ink-2);margin-bottom:6px;flex-wrap:wrap}
+.legend span::before{content:"";display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle;background:var(--c)}
+.chart{width:100%;position:relative}
+.chart svg{display:block;width:100%;overflow:visible}
+.chart text{font:11px system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--muted)}
+.tbl{width:100%;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
+th{font-weight:500;color:var(--ink-2);font-size:12px;cursor:pointer;user-select:none;position:sticky;top:0;background:var(--surface)}
+th:hover{color:var(--ink)}
+th.on{color:var(--ink)}
+th:first-child,td:first-child,th.left,td.left{text-align:left}
+.more{text-align:center;padding-top:12px}
+tr:last-child td{border-bottom:0}
+td.coin{font-weight:600}
+.pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:500}
+.pill.long{background:rgba(12,163,12,.12);color:var(--good-text)}
+.pill.short{background:rgba(208,59,59,.12);color:var(--bad-text)}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:#fff;font-size:12px;padding:6px 9px;border-radius:6px;opacity:0;transition:opacity .08s;z-index:10;white-space:nowrap;line-height:1.4}
+.tip b{font-weight:600}
+.status{padding:14px 18px;border-radius:var(--radius);margin-bottom:14px;font-size:13px}
+.status.err{background:#fbeaea;color:#7a1f1f;border:1px solid rgba(208,59,59,.3)}
+.status.load{background:var(--surface);color:var(--ink-2);border:1px solid var(--border)}
+.empty{color:var(--muted);font-size:13px;padding:12px 0}
+.filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:2px}
+.seg button{border:0;background:transparent;padding:5px 11px;border-radius:6px;font-size:13px;color:var(--ink-2)}
+.seg button:hover{background:var(--surface-2);color:var(--ink)}
+.seg button.on{background:var(--ink);color:#fff}
+.range{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2)}
+.range input{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 6px}
+.range-sum{margin-left:auto;font-size:13px;color:var(--ink-2)}
+@media (max-width:640px){.range-sum{margin-left:0;width:100%}}
+footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
+.skel{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Hyperliquid perps</h1>
+      <div class="sub"><span class="addr" id="addr"></span><span id="updated" class="badge">loading…</span></div>
+    </div>
+    <div><button id="refresh">Refresh</button></div>
+  </header>
+
+  <div id="status" class="status load">Loading account data…</div>
+
+  <div class="filters" id="filters">
+    <div class="seg" id="presets">
+      <button data-r="7">7D</button><button data-r="30">30D</button><button data-r="90">90D</button><button data-r="ytd">YTD</button><button data-r="all">All time</button>
+    </div>
+    <label class="range">From <input type="date" id="from"></label>
+    <label class="range">To <input type="date" id="to"></label>
+    <div class="range-sum" id="range-sum"></div>
+  </div>
+
+  <section class="grid tiles" id="tiles"></section>
+
+  <section class="grid two">
+    <div class="card">
+      <h2>Realized PnL <small>cumulative in range, net of fees</small></h2>
+      <div class="chart" id="equity"></div>
+    </div>
+    <div class="card">
+      <h2>Total PnL <small>realized + unrealized, excludes deposits and withdrawals</small></h2>
+      <div class="chart" id="acct"></div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Daily realized PnL <small id="daily-sub">net of fees</small></h2>
+      <div class="chart" id="daily"></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div class="card">
+      <h2>Trade quality <small id="tq-sub"></small></h2>
+      <div class="stats" id="quality"></div>
+    </div>
+    <div class="card">
+      <h2>PnL by coin <small>top 5 winners and losers, net of fees</small></h2>
+      <div class="chart" id="bycoin"></div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <div class="card">
+      <h2>Distribution of trade outcomes <small>net PnL per closed trade</small></h2>
+      <div class="chart" id="hist"></div>
+    </div>
+    <div class="card">
+      <h2>Costs &amp; activity <small>in selected range</small></h2>
+      <div class="stats" id="fees"></div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Per-coin breakdown <small>click a column to sort</small></h2>
+      <div class="tbl" id="cointable"></div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Trade log <small id="log-sub">closed trades in range, newest first</small></h2>
+      <div class="tbl" id="tradelog"></div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Open positions <small id="pos-sub"></small></h2>
+      <div class="tbl" id="positions"></div>
+    </div>
+  </section>
+
+  <footer>Data from the public Hyperliquid API. Closed-trade stats group fills into round trips per coin (open to flat) and are computed only from fills, fees and funding, so deposits and withdrawals never affect them. Period PnL tiles and the total PnL curve come from Hyperliquid's portfolio endpoint, which is also net of transfers.</footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+/* ---------- config ---------- */
+// No wallet is hardcoded: pass ?user=0x… in the URL. The last address used is remembered in this browser only.
+const API = 'https://api.hyperliquid.xyz/info';
+const qsUser = new URLSearchParams(location.search).get('user');
+let remembered = ''; try { remembered = localStorage.getItem('hl-user') || ''; } catch {}
+const user = (qsUser || remembered).trim();
+const CACHE_KEY = 'hl-stats:' + user.toLowerCase();
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const n = v => parseFloat(v) || 0;
+const fmtUsd = (v, {sign=false, compact=false, dec=2} = {}) => {
+  if (v == null || isNaN(v)) return '–';
+  const a = Math.abs(v);
+  let s;
+  if (compact && a >= 1e6) s = (a/1e6).toFixed(2) + 'M';
+  else if (compact && a >= 1e4) s = (a/1e3).toFixed(1) + 'K';
+  else s = a.toLocaleString('en-US', {minimumFractionDigits: dec, maximumFractionDigits: dec});
+  const pre = v < 0 ? '−$' : (sign && v > 0 ? '+$' : '$');
+  return pre + s;
+};
+const fmtNum = (v, dec=2) => v.toLocaleString('en-US', {maximumFractionDigits: dec});
+const fmtPct = (v, dec=1) => (v*100).toFixed(dec) + '%';
+const cls = v => v > 0 ? 'pos' : v < 0 ? 'neg' : '';
+const fmtDur = ms => {
+  const m = ms/6e4;
+  if (m < 60) return Math.round(m) + 'm';
+  if (m < 60*24) return (m/60).toFixed(1) + 'h';
+  return (m/1440).toFixed(1) + 'd';
+};
+const fmtDate = t => new Date(t).toLocaleDateString('en-US', {month:'short', day:'numeric'});
+const fmtDateTime = t => new Date(t).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const ago = t => { const s = (Date.now()-t)/1000; if (s<60) return 'just now'; if (s<3600) return Math.round(s/60)+'m ago'; if (s<86400) return Math.round(s/3600)+'h ago'; return Math.round(s/86400)+'d ago'; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- data ---------- */
+async function info(body) {
+  const r = await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  if (!r.ok) throw new Error(`API ${r.status} for ${body.type}`);
+  return r.json();
+}
+async function paged(type, pageSize, keyFn) {
+  const seen = new Set(), out = [];
+  let start = 0;
+  for (let i = 0; i < 50; i++) {
+    const page = await info({type, user, startTime: start, ...(type === 'userFillsByTime' ? {aggregateByTime: true} : {})});
+    let maxT = start;
+    for (const x of page) { const k = keyFn(x); if (!seen.has(k)) { seen.add(k); out.push(x); } if (x.time > maxT) maxT = x.time; }
+    if (page.length < pageSize) break;
+    start = maxT;
+  }
+  return out.sort((a,b) => a.time - b.time);
+}
+async function loadAll() {
+  const [state, portfolio, fills, funding] = await Promise.all([
+    info({type:'clearinghouseState', user}),
+    info({type:'portfolio', user}),
+    paged('userFillsByTime', 2000, f => f.tid),
+    paged('userFunding', 500, f => f.time + ':' + f.delta.coin),
+  ]);
+  return {ts: Date.now(), state, portfolio: Object.fromEntries(portfolio), fills, funding};
+}
+
+/* ---------- analytics ---------- */
+function roundTrips(fills) {
+  const byCoin = {};
+  const trades = [];
+  const round = x => Math.round(x * 1e8) / 1e8;
+  for (const f of fills) {
+    const sz = n(f.sz), px = n(f.px), delta = f.side === 'B' ? sz : -sz;
+    const startPos = round(n(f.startPosition));
+    const endPos = round(startPos + delta);
+    let t = byCoin[f.coin];
+    const flipped = startPos !== 0 && endPos !== 0 && Math.sign(startPos) !== Math.sign(endPos);
+    if (!t) {
+      t = byCoin[f.coin] = {coin: f.coin, dir: (startPos !== 0 ? startPos : delta) > 0 ? 'long' : 'short', open: f.time, close: null,
+        pnl: 0, fee: 0, vol: 0, fills: 0, maxSz: Math.abs(startPos), partial: startPos !== 0};
+    }
+    t.fills++; t.pnl += n(f.closedPnl); t.fee += n(f.fee); t.vol += sz * px; t.close = f.time;
+    t.maxSz = Math.max(t.maxSz, Math.abs(startPos), Math.abs(endPos));
+    if (endPos === 0) { t.net = t.pnl - t.fee; trades.push(t); byCoin[f.coin] = null; }
+    else if (flipped) { t.net = t.pnl - t.fee; trades.push(t); byCoin[f.coin] = {coin: f.coin, dir: endPos > 0 ? 'long' : 'short', open: f.time, close: f.time, pnl: 0, fee: 0, vol: 0, fills: 0, maxSz: Math.abs(endPos), partial: false}; }
+  }
+  const open = Object.values(byCoin).filter(Boolean);
+  return {trades, open};
+}
+function analyze(d, from = -Infinity, to = Infinity) {
+  const inR = t => t >= from && t <= to;
+  const {trades, open} = roundTrips(d.fills);          // group on full history so boundaries don't split trades
+  const fills = d.fills.filter(f => inR(f.time));
+  const funding = d.funding.filter(e => e.delta?.type === 'funding' && inR(e.time));
+  const closed = trades.filter(t => inR(t.close));      // a trade belongs to the range it closed in
+  const wins = closed.filter(t => t.net > 0), losses = closed.filter(t => t.net <= 0);
+  const sum = (a, k) => a.reduce((s, x) => s + (k ? x[k] : x), 0);
+  const gw = sum(wins, 'net'), gl = -sum(losses, 'net');
+  // cumulative realized curve
+  let cum = 0, peak = 0, mdd = 0; const curve = [];
+  for (const f of fills) { cum += n(f.closedPnl) - n(f.fee); curve.push({t: f.time, v: cum}); peak = Math.max(peak, cum); mdd = Math.max(mdd, peak - cum); }
+  // streaks
+  let cur = 0, maxW = 0, maxL = 0;
+  for (const t of closed) { if (t.net > 0) { cur = cur > 0 ? cur+1 : 1; maxW = Math.max(maxW, cur); } else { cur = cur < 0 ? cur-1 : -1; maxL = Math.max(maxL, -cur); } }
+  // daily
+  const daily = {};
+  for (const f of fills) { const k = dayKey(f.time); daily[k] = (daily[k] || 0) + n(f.closedPnl) - n(f.fee); }
+  // per coin
+  const coins = {}, coinRow = c => coins[c] ||= {coin: c, trades: 0, wins: 0, pnl: 0, fee: 0, vol: 0, funding: 0};
+  for (const f of fills) { const c = coinRow(f.coin); c.pnl += n(f.closedPnl); c.fee += n(f.fee); c.vol += n(f.sz) * n(f.px); }
+  for (const t of closed) { const c = coinRow(t.coin); c.trades++; if (t.net > 0) c.wins++; }
+  if (inR(Date.now())) for (const t of open) coinRow(t.coin).open = true;
+  for (const e of funding) coinRow(e.delta.coin).funding += n(e.delta.usdc);
+  for (const c of Object.values(coins)) { c.net = c.pnl - c.fee; c.winRate = c.trades ? c.wins / c.trades : null; }
+  const totalFees = sum(fills.map(f => n(f.fee)));
+  const totalVol = sum(fills.map(f => n(f.sz) * n(f.px)));
+  const fundEvents = funding;
+  const fundNet = sum(fundEvents.map(e => n(e.delta.usdc)));
+  const fundIn = sum(fundEvents.map(e => Math.max(0, n(e.delta.usdc))));
+  const bySide = side => { const s = closed.filter(t => t.dir === side); const w = s.filter(t => t.net > 0); return {n: s.length, wr: s.length ? w.length / s.length : null, net: sum(s, 'net'), avg: s.length ? sum(s, 'net') / s.length : null}; };
+  return {
+    trades: closed, open, count: closed.length, fillCount: fills.length, winRate: closed.length ? wins.length / closed.length : null,
+    profitFactor: gl > 0 ? gw / gl : (gw > 0 ? Infinity : null),
+    avgWin: wins.length ? gw / wins.length : null, avgLoss: losses.length ? -gl / losses.length : null,
+    expectancy: closed.length ? sum(closed, 'net') / closed.length : null,
+    largestWin: wins.length ? Math.max(...wins.map(t => t.net)) : null,
+    largestLoss: losses.length ? Math.min(...losses.map(t => t.net)) : null,
+    avgHold: closed.length ? sum(closed.map(t => t.close - t.open)) / closed.length : null,
+    avgHoldWin: wins.length ? sum(wins.map(t => t.close - t.open)) / wins.length : null,
+    avgHoldLoss: losses.length ? sum(losses.map(t => t.close - t.open)) / losses.length : null,
+    grossProfit: sum(fills.map(f => Math.max(0, n(f.closedPnl)))),
+    curve, mdd, streak: cur, maxW, maxL, daily, coins: Object.values(coins),
+    realized: sum(fills.map(f => n(f.closedPnl))), realizedNet: sum(fills.map(f => n(f.closedPnl) - n(f.fee))),
+    totalFees, totalVol, fundNet, fundIn, fundOut: fundNet - fundIn, fundEvents: fundEvents.length,
+    long: bySide('long'), short: bySide('short'),
+    unrealized: sum(d.state.assetPositions.map(p => n(p.position.unrealizedPnl))),
+  };
+}
+
+/* ---------- charts (inline SVG) ---------- */
+const tip = $('#tip');
+const showTip = (html, e) => { tip.innerHTML = html; tip.style.opacity = 1; moveTip(e); };
+const moveTip = e => { const w = tip.offsetWidth, h = tip.offsetHeight; let x = e.clientX + 12, y = e.clientY - h - 10; if (x + w > innerWidth - 8) x = e.clientX - w - 12; if (y < 8) y = e.clientY + 14; tip.style.left = x + 'px'; tip.style.top = y + 'px'; };
+const hideTip = () => tip.style.opacity = 0;
+const S = (name, attrs = {}, parent) => { const el = document.createElementNS('http://www.w3.org/2000/svg', name); for (const k in attrs) el.setAttribute(k, attrs[k]); if (parent) parent.appendChild(el); return el; };
+function niceTicks(min, max, count = 5) {
+  if (min === max) { min -= 1; max += 1; }
+  const span = max - min, raw = span / count, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= count) || mag * 10;
+  const ticks = []; for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) ticks.push(+v.toFixed(10));
+  return ticks;
+}
+const tickLabel = v => Math.abs(v) >= 1000 ? (v < 0 ? '−' : '') + '$' + (Math.abs(v)/1000).toFixed(Math.abs(v) % 1000 ? 1 : 0) + 'K' : (v < 0 ? '−' : '') + '$' + Math.abs(v);
+function frame(container, height, pad) {
+  container.innerHTML = '';
+  const W = Math.max(280, container.clientWidth), H = height;
+  const svg = S('svg', {width: W, height: H, viewBox: `0 0 ${W} ${H}`}, container);
+  return {svg, W, H, x0: pad.l, x1: W - pad.r, y0: pad.t, y1: H - pad.b};
+}
+function yAxis(f, ticks, scale) {
+  for (const v of ticks) {
+    const y = scale(v);
+    S('line', {x1: f.x0, x2: f.x1, y1: y, y2: y, stroke: v === 0 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1}, f.svg);
+    const t = S('text', {x: f.x0 - 8, y: y + 4, 'text-anchor': 'end'}, f.svg); t.textContent = tickLabel(v);
+  }
+}
+
+function lineChart(container, series, tEnd = Date.now(), tStart = Infinity) {
+  const all = series.flatMap(s => s.points);
+  if (!all.length) { container.innerHTML = '<div class="empty">No history yet.</div>'; return; }
+  const f = frame(container, 260, {l: 56, r: 16, t: 12, b: 26});
+  const tMin = Math.min(...all.map(p => p.t), isFinite(tStart) ? tStart : Infinity), tMax = Math.max(...all.map(p => p.t), Math.min(tEnd, Date.now()));
+  let vMin = Math.min(0, ...all.map(p => p.v)), vMax = Math.max(0, ...all.map(p => p.v));
+  const ticks = niceTicks(vMin, vMax, 5); vMin = Math.min(vMin, ticks[0]); vMax = Math.max(vMax, ticks[ticks.length - 1]);
+  const X = t => f.x0 + (t - tMin) / (tMax - tMin || 1) * (f.x1 - f.x0);
+  const Y = v => f.y1 - (v - vMin) / (vMax - vMin || 1) * (f.y1 - f.y0);
+  yAxis(f, ticks, Y);
+  // x labels: ~6 dates
+  const nLab = Math.min(6, Math.floor((f.x1 - f.x0) / 90));
+  for (let i = 0; i <= nLab; i++) { const t = tMin + (tMax - tMin) * i / nLab; const el = S('text', {x: X(t), y: f.H - 8, 'text-anchor': i === 0 ? 'start' : i === nLab ? 'end' : 'middle'}, f.svg); el.textContent = fmtDate(t); }
+  for (const s of series) {
+    if (!s.points.length) continue;
+    let d = ''; s.points.forEach((p, i) => { const x = X(p.t), y = Y(p.v); d += (i ? (s.step ? `H${x.toFixed(1)}V${y.toFixed(1)}` : `L${x.toFixed(1)},${y.toFixed(1)}`) : `M${x.toFixed(1)},${y.toFixed(1)}`); });
+    // extend to now
+    const last = s.points[s.points.length - 1]; d += `H${X(tMax).toFixed(1)}`;
+    if (s.fill) S('path', {d: d + `V${Y(0)}H${X(s.points[0].t)}Z`, fill: s.color, opacity: .1}, f.svg);
+    S('path', {d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, f.svg);
+    const dot = S('circle', {cx: X(tMax), cy: Y(last.v), r: 4, fill: s.color, stroke: 'var(--surface)', 'stroke-width': 2}, f.svg);
+  }
+  // hover crosshair
+  const cross = S('line', {y1: f.y0, y2: f.y1, stroke: 'var(--axis)', 'stroke-width': 1, opacity: 0}, f.svg);
+  const dots = series.map(s => S('circle', {r: 5, fill: s.color, stroke: 'var(--surface)', 'stroke-width': 2, opacity: 0}, f.svg));
+  const hit = S('rect', {x: f.x0, y: f.y0, width: f.x1 - f.x0, height: f.y1 - f.y0, fill: 'transparent'}, f.svg);
+  const valueAt = (pts, t) => { let lo = 0, hi = pts.length - 1; if (t < pts[0].t) return null; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (pts[m].t <= t) lo = m; else hi = m - 1; } return pts[lo].v; };
+  hit.addEventListener('mousemove', e => {
+    const r = f.svg.getBoundingClientRect(), x = e.clientX - r.left, t = tMin + (x - f.x0) / (f.x1 - f.x0) * (tMax - tMin);
+    cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', 1);
+    let html = `<b>${fmtDateTime(t)}</b>`;
+    series.forEach((s, i) => { const v = valueAt(s.points, t); if (v == null) { dots[i].setAttribute('opacity', 0); return; } dots[i].setAttribute('cx', x); dots[i].setAttribute('cy', Y(v)); dots[i].setAttribute('opacity', 1); html += `<br>${s.name}: ${fmtUsd(v)}`; });
+    showTip(html, e);
+  });
+  hit.addEventListener('mouseleave', () => { cross.setAttribute('opacity', 0); dots.forEach(d => d.setAttribute('opacity', 0)); hideTip(); });
+}
+
+function dailyBars(container, dailyMap, from, to) {
+  const f = frame(container, 220, {l: 56, r: 12, t: 12, b: 26});
+  const start = new Date(from); start.setHours(0, 0, 0, 0);
+  const end = new Date(to); end.setHours(0, 0, 0, 0);
+  const nDays = Math.round((end - start) / 864e5) + 1;
+  const weekly = nDays > 120;
+  const rows = [];
+  if (weekly) { const d = new Date(start); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); while (d <= end) { rows.push({t: d.getTime(), v: 0, has: false, wk: true}); d.setDate(d.getDate() + 7); } for (const k in dailyMap) { const t = new Date(k + 'T00:00').getTime(); const i = Math.floor((t - rows[0].t) / (7 * 864e5)); if (rows[i]) { rows[i].v += dailyMap[k]; rows[i].has = true; } } }
+  else for (let i = 0; i < nDays; i++) { const d = new Date(start); d.setDate(d.getDate() + i); const k = dayKey(d); rows.push({k, t: d.getTime(), v: dailyMap[k] || 0, has: k in dailyMap}); }
+  const days = rows.length;
+  const vals = rows.map(r => r.v); let vMin = Math.min(0, ...vals), vMax = Math.max(0, ...vals);
+  if (vMin === 0 && vMax === 0) vMax = 1;
+  const ticks = niceTicks(vMin, vMax, 4); vMin = Math.min(vMin, ticks[0]); vMax = Math.max(vMax, ticks[ticks.length - 1]);
+  const Y = v => f.y1 - (v - vMin) / (vMax - vMin) * (f.y1 - f.y0);
+  yAxis(f, ticks, Y);
+  const slot = (f.x1 - f.x0) / days, bw = Math.min(24, Math.max(2, slot - 2));
+  rows.forEach((r, i) => {
+    const x = f.x0 + i * slot + (slot - bw) / 2, y0 = Y(0), y = Y(r.v), h = Math.abs(y - y0);
+    const top = Math.min(y, y0), rad = Math.min(4, bw / 2, h);
+    const up = r.v >= 0;
+    const d = h < .5 ? '' : up
+      ? `M${x},${y0}V${top + rad}Q${x},${top} ${x + rad},${top}H${x + bw - rad}Q${x + bw},${top} ${x + bw},${top + rad}V${y0}Z`
+      : `M${x},${y0}V${y0 + h - rad}Q${x},${y0 + h} ${x + rad},${y0 + h}H${x + bw - rad}Q${x + bw},${y0 + h} ${x + bw},${y0 + h - rad}V${y0}Z`;
+    if (d) S('path', {d, fill: up ? 'var(--good)' : 'var(--bad)'}, f.svg);
+    const hit = S('rect', {x: f.x0 + i * slot, y: f.y0, width: slot, height: f.y1 - f.y0, fill: 'transparent'}, f.svg);
+    hit.addEventListener('mousemove', e => showTip(`<b>${r.wk ? 'Week of ' : ''}${fmtDate(r.t)}</b><br>${!r.has ? 'No closed trades' : fmtUsd(r.v, {sign: true})}`, e));
+    hit.addEventListener('mouseleave', hideTip);
+  });
+  const nLab = Math.max(1, Math.min(5, Math.floor((f.x1 - f.x0) / 80), days - 1));
+  for (let i = 0; i <= nLab; i++) { const idx = Math.round((days - 1) * i / nLab); const el = S('text', {x: f.x0 + idx * slot + slot / 2, y: f.H - 8, 'text-anchor': i === 0 ? 'start' : i === nLab ? 'end' : 'middle'}, f.svg); el.textContent = fmtDate(rows[idx].t); }
+}
+
+function hBars(container, rows) {
+  if (!rows.length) { container.innerHTML = '<div class="empty">No closed trades yet.</div>'; return; }
+  const rowH = 24, f = frame(container, rows.length * rowH + 30, {l: 64, r: 70, t: 6, b: 22});
+  const vMax = Math.max(...rows.map(r => Math.abs(r.v)), 1);
+  const X = v => f.x0 + (f.x1 - f.x0) * (v + vMax) / (2 * vMax);
+  const zero = X(0);
+  S('line', {x1: zero, x2: zero, y1: f.y0, y2: f.y1, stroke: 'var(--axis)'}, f.svg);
+  rows.forEach((r, i) => {
+    const y = f.y0 + i * rowH + 4, h = rowH - 8, x = X(r.v), w = Math.abs(x - zero), rad = Math.min(4, w);
+    const up = r.v >= 0;
+    if (w > .5) S('path', {d: up ? `M${zero},${y}H${x - rad}Q${x},${y} ${x},${y + rad}V${y + h - rad}Q${x},${y + h} ${x - rad},${y + h}H${zero}Z` : `M${zero},${y}H${x + rad}Q${x},${y} ${x},${y + rad}V${y + h - rad}Q${x},${y + h} ${x + rad},${y + h}H${zero}Z`, fill: up ? 'var(--good)' : 'var(--bad)'}, f.svg);
+    const lab = S('text', {x: f.x0 - 8, y: y + h / 2 + 4, 'text-anchor': 'end', style: 'fill:var(--ink);font-weight:600'}, f.svg); lab.textContent = r.label;
+    const val = S('text', {x: up ? x + 6 : x - 6, y: y + h / 2 + 4, 'text-anchor': up ? 'start' : 'end', style: 'fill:var(--ink-2)'}, f.svg); val.textContent = fmtUsd(r.v, {sign: true, dec: 0});
+    const hit = S('rect', {x: 0, y, width: f.W, height: h, fill: 'transparent'}, f.svg);
+    hit.addEventListener('mousemove', e => showTip(`<b>${r.label}</b><br>Net PnL: ${fmtUsd(r.v, {sign: true})}<br>${r.trades} closed trade${r.trades === 1 ? '' : 's'}${r.winRate != null ? ' · ' + fmtPct(r.winRate) + ' win' : ''}`, e));
+    hit.addEventListener('mouseleave', hideTip);
+  });
+}
+
+function histogram(container, values) {
+  if (!values.length) { container.innerHTML = '<div class="empty">No closed trades yet.</div>'; return; }
+  const f = frame(container, 200, {l: 36, r: 12, t: 12, b: 26});
+  const lo = Math.min(...values), hi = Math.max(...values), ext = Math.max(Math.abs(lo), Math.abs(hi)) || 1;
+  const bins = 16, width = 2 * ext / bins, counts = new Array(bins).fill(0);
+  for (const v of values) counts[Math.min(bins - 1, Math.floor((v + ext) / width))]++;
+  const cMax = Math.max(...counts);
+  const ticks = niceTicks(0, cMax, 4);
+  const Y = c => f.y1 - c / (ticks[ticks.length - 1] || 1) * (f.y1 - f.y0);
+  for (const t of ticks) { S('line', {x1: f.x0, x2: f.x1, y1: Y(t), y2: Y(t), stroke: t === 0 ? 'var(--axis)' : 'var(--grid)'}, f.svg); const l = S('text', {x: f.x0 - 8, y: Y(t) + 4, 'text-anchor': 'end'}, f.svg); l.textContent = t; }
+  const slot = (f.x1 - f.x0) / bins, bw = Math.min(24, slot - 2);
+  counts.forEach((c, i) => {
+    const from = -ext + i * width, to = from + width, x = f.x0 + i * slot + (slot - bw) / 2, y = Y(c), h = f.y1 - y, rad = Math.min(4, h, bw / 2);
+    const good = from + width / 2 >= 0;
+    if (h > .5) S('path', {d: `M${x},${f.y1}V${y + rad}Q${x},${y} ${x + rad},${y}H${x + bw - rad}Q${x + bw},${y} ${x + bw},${y + rad}V${f.y1}Z`, fill: good ? 'var(--good)' : 'var(--bad)'}, f.svg);
+    const hit = S('rect', {x: f.x0 + i * slot, y: f.y0, width: slot, height: f.y1 - f.y0, fill: 'transparent'}, f.svg);
+    hit.addEventListener('mousemove', e => showTip(`<b>${fmtUsd(from, {dec: 0})} to ${fmtUsd(to, {dec: 0})}</b><br>${c} trade${c === 1 ? '' : 's'}`, e));
+    hit.addEventListener('mouseleave', hideTip);
+  });
+  [[-ext, 'start'], [0, 'middle'], [ext, 'end']].forEach(([v, a]) => { const el = S('text', {x: f.x0 + (v + ext) / (2 * ext) * (f.x1 - f.x0), y: f.H - 8, 'text-anchor': a}, f.svg); el.textContent = fmtUsd(v, {dec: 0}); });
+}
+
+/* ---------- render ---------- */
+let DATA = null, A = null, sortKey = 'net', sortDir = -1, LOG_ALL = false;
+let RANGE = {key: 'all', from: '', to: ''};
+try { const r = JSON.parse(localStorage.getItem('hl-range')); if (r && r.key) RANGE = r; } catch {}
+const startOfDay = d => { d = new Date(d); d.setHours(0, 0, 0, 0); return d.getTime(); };
+function rangeBounds() {
+  const now = Date.now(), today = startOfDay(now);
+  if (RANGE.key === 'all') return {from: -Infinity, to: Infinity, label: 'All time'};
+  if (RANGE.key === 'ytd') return {from: new Date(new Date().getFullYear(), 0, 1).getTime(), to: Infinity, label: 'Year to date'};
+  if (RANGE.key === 'custom') {
+    const from = RANGE.from ? new Date(RANGE.from + 'T00:00').getTime() : -Infinity;
+    const to = RANGE.to ? new Date(RANGE.to + 'T00:00').getTime() + 864e5 - 1 : Infinity;
+    return {from, to, label: `${RANGE.from ? fmtDate(from) : 'start'} to ${RANGE.to ? fmtDate(to) : 'now'}`};
+  }
+  const days = +RANGE.key; return {from: today - (days - 1) * 864e5, to: Infinity, label: `Last ${days} days`};
+}
+function setRange(r) { RANGE = r; try { localStorage.setItem('hl-range', JSON.stringify(r)); } catch {} if (DATA) { A = analyze(DATA, rangeBounds().from, rangeBounds().to); render(); } else syncFilters(); }
+function syncFilters() {
+  $('#presets').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.r === RANGE.key));
+  $('#from').value = RANGE.key === 'custom' ? RANGE.from : ''; $('#to').value = RANGE.key === 'custom' ? RANGE.to : '';
+}
+$('#presets').onclick = e => { const b = e.target.closest('button'); if (b) setRange({key: b.dataset.r, from: '', to: ''}); };
+const onCustom = () => { let from = $('#from').value, to = $('#to').value; if (!from && !to) return setRange({key: 'all', from: '', to: ''}); if (from && to && from > to) [from, to] = [to, from]; setRange({key: 'custom', from, to}); };
+$('#from').onchange = onCustom; $('#to').onchange = onCustom;
+const stat = (k, v, s = '', c = '') => `<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
+const tile = (label, v, delta = '', c = '') => `<div class="card tile"><div class="label">${label}</div><div class="value ${c}">${v}</div><div class="delta">${delta}</div></div>`;
+
+function render() {
+  const d = DATA, a = A, p = d.portfolio, ms = d.state.marginSummary;
+  const rb = rangeBounds();
+  syncFilters();
+  const netInRange = a.realizedNet + a.fundNet;
+  $('#range-sum').innerHTML = `<b>${rb.label}</b> · ${a.count} closed trade${a.count === 1 ? '' : 's'} · <span class="${cls(netInRange)}">${fmtUsd(netInRange, {sign: true})}</span> realized after fees and funding`;
+  const acct = n(ms.accountValue);                                   // perp account (capital at risk)
+  const total = n(p.allTime?.accountValueHistory?.at(-1)?.[1]) || acct;  // perp + spot, Hyperliquid's own total
+  // Return on capital deployed: account value now minus the window's PnL equals starting equity plus any deposits made
+  // during the window, so the percentage stays sane even when the account was empty at the start of the window.
+  const per = k => { const x = p[k]; if (!x) return {pnl: 0, vlm: 0, pct: null};
+    const pnl = n(x.pnlHistory.at(-1)?.[1]), capital = acct - pnl; return {pnl, vlm: n(x.vlm), pct: capital > 0 ? pnl / capital : null}; };
+  const pctLine = x => x.pct == null ? '' : `<span class="${cls(x.pnl)}">${x.pnl > 0 ? '+' : x.pnl < 0 ? '−' : ''}${fmtPct(Math.abs(x.pct))}</span> on capital · `;
+  const day = per('perpDay'), week = per('perpWeek'), month = per('perpMonth'), all = per('perpAllTime');
+  // Capital deployed = perp equity minus the PnL not yet withdrawn (realized in window + unrealized), i.e. net deposits at work.
+  const rangeNet = a.realizedNet + a.fundNet, rangeCap = rb.to === Infinity ? acct - rangeNet - a.unrealized : 0;
+  const rangeWr = a.winRate == null ? '' : ` · ${fmtPct(a.winRate, 0)} win rate`;
+  const allRealized = d.fills.reduce((s, f) => s + n(f.closedPnl) - n(f.fee), 0) + d.funding.reduce((s, e) => s + (e.delta?.type === 'funding' ? n(e.delta.usdc) : 0), 0);
+  const allCap = acct - allRealized - a.unrealized;
+  const T = (kind, when) => `${kind} <em>· ${when}</em>`;
+  $('#tiles').innerHTML = [
+    tile('Account value', fmtUsd(total), `perp ${fmtUsd(acct, {dec: 0})} · ${fmtUsd(Math.max(0, total - acct), {dec: 0})} idle in spot · ${fmtUsd(n(ms.totalMarginUsed), {dec: 0})} margin in use`),
+    tile(T('Realized PnL', 'all time'), fmtUsd(allRealized, {sign: true}), `closed trades, after fees and funding${allCap > 0 ? ` · <span class="${cls(allRealized)}">${allRealized > 0 ? '+' : allRealized < 0 ? '−' : ''}${fmtPct(Math.abs(allRealized / allCap))}</span> on capital` : ''}`, cls(allRealized)),
+    tile(T('Unrealized PnL', 'open now'), fmtUsd(a.unrealized, {sign: true}), `${d.state.assetPositions.length} open position${d.state.assetPositions.length === 1 ? '' : 's'} at current mark`, cls(a.unrealized)),
+    tile(T('Total PnL', 'all time'), fmtUsd(all.pnl, {sign: true}), `realized + unrealized · ${pctLine(all)}${fmtUsd(all.vlm, {compact: true, dec: 0})} volume`, cls(all.pnl)),
+    tile(T('Realized PnL', 'selected range'), fmtUsd(rangeNet, {sign: true}), `${rb.label} · ${rangeCap > 0 ? `<span class="${cls(rangeNet)}">${rangeNet > 0 ? '+' : rangeNet < 0 ? '−' : ''}${fmtPct(Math.abs(rangeNet / rangeCap))}</span> on capital · ` : ''}${a.count} trade${a.count === 1 ? '' : 's'}${rangeWr}`, cls(rangeNet)),
+    tile(T('Total PnL', 'today'), fmtUsd(day.pnl, {sign: true}), `${pctLine(day)}${fmtUsd(day.vlm, {compact: true, dec: 0})} volume`, cls(day.pnl)),
+    tile(T('Total PnL', '7 days'), fmtUsd(week.pnl, {sign: true}), `${pctLine(week)}${fmtUsd(week.vlm, {compact: true, dec: 0})} volume`, cls(week.pnl)),
+    tile(T('Total PnL', '30 days'), fmtUsd(month.pnl, {sign: true}), `${pctLine(month)}${fmtUsd(month.vlm, {compact: true, dec: 0})} volume`, cls(month.pnl)),
+  ].join('');
+
+  // Hyperliquid's pnlHistory is account value minus net transfers, so deposits/withdrawals never show up here.
+  const pnlAll = (p.perpAllTime?.pnlHistory || []).map(([t, v]) => ({t, v: n(v)}));
+  const anchor = pnlAll.filter(pt => pt.t < rb.from).at(-1);
+  const base = anchor ? anchor.v : 0;
+  const pnlHist = pnlAll.filter(pt => pt.t >= rb.from && pt.t <= rb.to).map(pt => ({t: pt.t, v: pt.v - base}));
+  if (anchor) pnlHist.unshift({t: rb.from, v: 0});
+  const curve = isFinite(rb.from) && a.curve.length && a.curve[0].t > rb.from ? [{t: rb.from, v: 0}, ...a.curve] : a.curve;  // start flat at 0 from range start
+  lineChart($('#equity'), [{name: 'Realized PnL', color: 'var(--accent)', points: curve, step: true, fill: true}], rb.to, rb.from);
+  lineChart($('#acct'), [{name: 'Total PnL', color: '#52514e', points: pnlHist, fill: true}], rb.to, rb.from);
+  const firstFill = d.fills[0]?.time ?? Date.now();
+  const dFrom = Math.max(rb.from, firstFill), dTo = Math.min(rb.to, Date.now());
+  const span = Math.round((startOfDay(dTo) - startOfDay(dFrom)) / 864e5) + 1;
+  $('#daily-sub').textContent = (span > 120 ? 'weekly, ' : '') + (RANGE.key === 'custom' ? rb.label : rb.label[0].toLowerCase() + rb.label.slice(1)) + ', net of fees';
+  dailyBars($('#daily'), a.daily, dFrom, dTo);
+
+  $('#tq-sub').textContent = `${a.count} closed trades${a.open.length ? `, ${a.open.length} open` : ''}`;
+  const pf = a.profitFactor;
+  const sideStat = (name, s) => stat(`${name} trades`, s.n ? fmtUsd(s.net, {sign: true}) : '–', s.n ? `${s.n} trade${s.n === 1 ? '' : 's'} · ${fmtPct(s.wr, 0)} win rate · ${fmtUsd(s.avg, {sign: true})} avg` : 'none in range', s.n ? cls(s.net) : '');
+  $('#quality').innerHTML = [
+    stat('Win rate', a.winRate == null ? '–' : fmtPct(a.winRate), `${a.trades.filter(t => t.net > 0).length} W · ${a.trades.filter(t => t.net <= 0).length} L`),
+    stat('Profit factor', pf == null ? '–' : pf === Infinity ? '∞' : pf.toFixed(2), 'gross wins ÷ gross losses', pf != null && pf !== Infinity ? (pf >= 1 ? 'pos' : 'neg') : ''),
+    stat('Expectancy', a.expectancy == null ? '–' : fmtUsd(a.expectancy, {sign: true}), 'avg net per trade', cls(a.expectancy)),
+    stat('Average win', a.avgWin == null ? '–' : fmtUsd(a.avgWin, {sign: true}), '', 'pos'),
+    stat('Average loss', a.avgLoss == null ? '–' : fmtUsd(a.avgLoss, {sign: true}), a.avgWin && a.avgLoss ? `${(a.avgWin / -a.avgLoss).toFixed(2)}× win/loss` : '', 'neg'),
+    stat('Avg hold time', a.avgHold == null ? '–' : fmtDur(a.avgHold), a.avgHoldWin != null && a.avgHoldLoss != null ? `winners ${fmtDur(a.avgHoldWin)} · losers ${fmtDur(a.avgHoldLoss)}` : ''),
+    stat('Largest win', a.largestWin == null ? '–' : fmtUsd(a.largestWin, {sign: true}), '', 'pos'),
+    stat('Largest loss', a.largestLoss == null ? '–' : fmtUsd(a.largestLoss, {sign: true}), '', 'neg'),
+    stat('Max drawdown', fmtUsd(-a.mdd), 'on realized PnL curve', a.mdd ? 'neg' : ''),
+    stat('Current streak', a.streak === 0 ? '–' : `${Math.abs(a.streak)} ${a.streak > 0 ? 'win' : 'loss'}${Math.abs(a.streak) === 1 ? '' : a.streak > 0 ? 's' : 'es'}`, `best ${a.maxW} wins · worst ${a.maxL} losses`, cls(a.streak)),
+    sideStat('Long', a.long),
+    sideStat('Short', a.short),
+  ].join('');
+
+  histogram($('#hist'), a.trades.map(t => t.net));
+
+  const ranked = a.coins.filter(c => c.trades).sort((x, y) => y.net - x.net);
+  const top = ranked.slice(0, 5).filter(c => c.net > 0), bottom = ranked.slice(-5).filter(c => c.net < 0 && !top.includes(c));
+  hBars($('#bycoin'), [...top, ...bottom].map(c => ({label: c.coin, v: c.net, trades: c.trades, winRate: c.winRate})));
+
+  const costs = a.totalFees + Math.max(0, -a.fundNet), drag = a.grossProfit ? costs / a.grossProfit : null;
+  $('#fees').innerHTML = [
+    stat('Fees paid', fmtUsd(a.totalFees), a.totalVol ? `${(a.totalFees / a.totalVol * 100).toFixed(3)}% of volume` : ''),
+    stat('Net funding', fmtUsd(a.fundNet, {sign: true}), `${fmtUsd(a.fundIn, {dec: 0})} received · ${fmtUsd(a.fundOut, {dec: 0})} paid`, cls(a.fundNet)),
+    stat('Cost drag', drag == null ? '–' : fmtPct(drag), `fees + funding paid vs ${fmtUsd(a.grossProfit, {dec: 0})} gross profits`, drag != null && drag > 0.25 ? 'neg' : ''),
+    stat('Gross realized', fmtUsd(a.realized, {sign: true}), 'before fees and funding', cls(a.realized)),
+    stat('Net realized', fmtUsd(a.realizedNet + a.fundNet, {sign: true}), 'after fees and funding', cls(a.realizedNet + a.fundNet)),
+    stat('Total volume', fmtUsd(a.totalVol, {compact: true, dec: 0}), `${a.fillCount} fills · ${a.coins.filter(c => c.trades || c.open).length} coins`),
+  ].join('');
+
+  renderCoinTable();
+  renderTradeLog();
+  renderPositions();
+}
+
+function renderCoinTable() {
+  const cols = [['coin', 'Coin'], ['trades', 'Trades'], ['winRate', 'Win rate'], ['pnl', 'Gross PnL'], ['fee', 'Fees'], ['funding', 'Funding'], ['net', 'Net PnL'], ['vol', 'Volume']];
+  const rows = [...A.coins].sort((x, y) => { const a = x[sortKey], b = y[sortKey]; if (a == null) return 1; if (b == null) return -1; return (typeof a === 'string' ? a.localeCompare(b) : a - b) * sortDir; });
+  const h = cols.map(([k, l]) => `<th data-k="${k}" class="${k === sortKey ? 'on' : ''}">${l}${k === sortKey ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('');
+  const b = rows.map(c => `<tr><td class="coin">${esc(c.coin)}${c.open ? ' <span class="badge">open</span>' : ''}</td><td>${c.trades}</td><td>${c.winRate == null ? '–' : fmtPct(c.winRate, 0)}</td><td class="${cls(c.pnl)}">${fmtUsd(c.pnl, {sign: true})}</td><td>${fmtUsd(c.fee)}</td><td class="${cls(c.funding)}">${fmtUsd(c.funding, {sign: true})}</td><td class="${cls(c.net)}"><b>${fmtUsd(c.net, {sign: true})}</b></td><td>${fmtUsd(c.vol, {compact: true, dec: 0})}</td></tr>`).join('');
+  $('#cointable').innerHTML = rows.length ? `<table><thead><tr>${h}</tr></thead><tbody>${b}</tbody></table>` : '<div class="empty">No trades yet.</div>';
+  $('#cointable').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = k === 'coin' ? 1 : -1; } renderCoinTable(); });
+}
+
+function renderTradeLog() {
+  const rows = [...A.trades].sort((x, y) => y.close - x.close);
+  $('#log-sub').textContent = rows.length ? `${rows.length} closed trade${rows.length === 1 ? '' : 's'} in range, newest first` : 'closed trades in range';
+  if (!rows.length) { $('#tradelog').innerHTML = '<div class="empty">No closed trades in this range.</div>'; return; }
+  const shown = LOG_ALL ? rows : rows.slice(0, 20);
+  const body = shown.map(t => `<tr><td>${fmtDateTime(t.close)}</td><td class="coin left">${esc(t.coin)} <span class="pill ${t.dir}">${t.dir === 'long' ? 'Long' : 'Short'}</span>${t.partial ? ' <span class="badge" title="Opened before the start of available fill history">partial</span>' : ''}</td><td>${fmtDur(t.close - t.open)}</td><td>${t.fills}</td><td>${fmtUsd(t.vol, {compact: true, dec: 0})}</td><td>${fmtUsd(t.fee)}</td><td class="${cls(t.net)}"><b>${fmtUsd(t.net, {sign: true})}</b></td></tr>`).join('');
+  const more = rows.length > shown.length ? `<div class="more"><button id="log-more">Show all ${rows.length} trades</button></div>` : (LOG_ALL && rows.length > 20 ? `<div class="more"><button id="log-more">Show fewer</button></div>` : '');
+  $('#tradelog').innerHTML = `<table><thead><tr><th style="cursor:default">Closed</th><th style="cursor:default" class="left">Coin</th><th style="cursor:default">Hold</th><th style="cursor:default">Fills</th><th style="cursor:default">Volume</th><th style="cursor:default">Fees</th><th style="cursor:default">Net PnL</th></tr></thead><tbody>${body}</tbody></table>${more}`;
+  const b = $('#log-more'); if (b) b.onclick = () => { LOG_ALL = !LOG_ALL; renderTradeLog(); };
+}
+
+function renderPositions() {
+  const ps = DATA.state.assetPositions.map(p => p.position).sort((a, b) => n(b.positionValue) - n(a.positionValue));
+  const totalNtl = ps.reduce((s, p) => s + n(p.positionValue), 0);
+  $('#pos-sub').textContent = ps.length ? `${fmtUsd(totalNtl, {dec: 0})} notional` : '';
+  if (!ps.length) { $('#positions').innerHTML = '<div class="empty">No open positions.</div>'; return; }
+  const rows = ps.map(p => { const sz = n(p.szi), long = sz > 0, upnl = n(p.unrealizedPnl), mark = Math.abs(sz) ? n(p.positionValue) / Math.abs(sz) : 0; return `<tr>
+    <td class="coin">${esc(p.coin)} <span class="pill ${long ? 'long' : 'short'}">${long ? 'Long' : 'Short'}</span></td>
+    <td>${fmtNum(Math.abs(sz), 4)}</td><td>${fmtUsd(n(p.positionValue), {dec: 0})}</td><td>${fmtNum(n(p.entryPx), 5)}</td><td>${fmtNum(mark, 5)}</td>
+    <td>${p.leverage?.value ?? '–'}× <span class="badge">${p.leverage?.type ?? ''}</span></td>
+    <td class="${cls(upnl)}"><b>${fmtUsd(upnl, {sign: true})}</b></td><td class="${cls(upnl)}">${fmtPct(n(p.returnOnEquity))}</td>
+    <td>${p.liquidationPx ? fmtNum(n(p.liquidationPx), 5) : '–'}</td><td class="${cls(-n(p.cumFunding?.sinceOpen))}">${fmtUsd(-n(p.cumFunding?.sinceOpen), {sign: true})}</td></tr>`; }).join('');
+  $('#positions').innerHTML = `<table><thead><tr><th style="cursor:default">Coin</th><th style="cursor:default">Size</th><th style="cursor:default">Value</th><th style="cursor:default">Entry</th><th style="cursor:default">Mark</th><th style="cursor:default">Leverage</th><th style="cursor:default">Unrealized</th><th style="cursor:default">ROE</th><th style="cursor:default">Liq. price</th><th style="cursor:default">Funding</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+/* ---------- boot ---------- */
+function setStatus(kind, msg) { const s = $('#status'); if (!kind) { s.hidden = true; return; } s.hidden = false; s.className = 'status ' + kind; s.textContent = msg; }
+function apply(d, fromCache) {
+  DATA = d; const rb = rangeBounds(); A = analyze(d, rb.from, rb.to);
+  $('#updated').textContent = (fromCache ? 'cached · ' : 'updated ') + ago(d.ts);
+  render();
+}
+async function refresh() {
+  const btn = $('#refresh'); btn.disabled = true; btn.textContent = 'Refreshing…';
+  try {
+    const d = await loadAll();
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch {}
+    apply(d, false); setStatus(null);
+  } catch (e) {
+    setStatus('err', `Could not reach the Hyperliquid API (${e.message}). ${DATA ? 'Showing the last cached data.' : 'Check your connection and try again.'}`);
+  } finally { btn.disabled = false; btn.textContent = 'Refresh'; }
+}
+$('#addr').textContent = user ? user.slice(0, 6) + '…' + user.slice(-4) : 'no wallet';
+$('#addr').title = user;
+$('#refresh').onclick = refresh;
+if (user) try { const c = JSON.parse(localStorage.getItem(CACHE_KEY)); if (c && c.fills) { apply(c, true); setStatus('load', 'Showing cached data, refreshing…'); } } catch {}
+function askForWallet(msg) {
+  $('.filters').hidden = true; $('#tiles').innerHTML = ''; $('#refresh').hidden = true;
+  const s = $('#status'); s.hidden = false; s.className = 'status load';
+  s.innerHTML = `<form id="wallet-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span>${msg}</span><input id="wallet" placeholder="0x…" style="font:inherit;font-family:ui-monospace,Menlo,monospace;flex:1;min-width:260px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><button type="submit">Open</button></form>`;
+  document.querySelectorAll('section.grid, footer').forEach(el => el.hidden = true);
+  $('#wallet-form').onsubmit = e => { e.preventDefault(); const v = $('#wallet').value.trim(); if (/^0x[0-9a-fA-F]{40}$/.test(v)) location.search = '?user=' + v; else $('#wallet').style.borderColor = 'var(--bad)'; };
+}
+if (!user) askForWallet('Enter a Hyperliquid wallet address to view its stats.');
+else if (!/^0x[0-9a-fA-F]{40}$/.test(user)) askForWallet(`"${esc(user)}" is not a valid wallet address.`);
+else { try { localStorage.setItem('hl-user', user); } catch {} refresh(); }
+let rt, lastW = 0; new ResizeObserver(([e]) => { const w = e.contentRect.width; if (Math.abs(w - lastW) < 2) return; lastW = w; clearTimeout(rt); rt = setTimeout(() => DATA && render(), 120); }).observe($('.wrap'));
+setInterval(() => { if (DATA) $('#updated').textContent = $('#updated').textContent.replace(/(cached · |updated ).*/, '$1' + ago(DATA.ts)); }, 30000);
+</script>
+</body>
+</html>
