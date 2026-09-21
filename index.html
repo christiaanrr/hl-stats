@@ -585,18 +585,25 @@ function render() {
     const pnl = n(x.pnlHistory.at(-1)?.[1]), capital = acct - pnl; return {pnl, vlm: n(x.vlm), pct: capital > 0 ? pnl / capital : null}; };
   const pctLine = x => x.pct == null ? '' : `<span class="${cls(x.pnl)}">${x.pnl > 0 ? '+' : x.pnl < 0 ? '−' : ''}${fmtPct(Math.abs(x.pct))}</span> on capital · `;
   const day = per('perpDay'), week = per('perpWeek'), month = per('perpMonth'), all = per('perpAllTime');
-  // Capital deployed = perp equity minus the PnL not yet withdrawn (realized in window + unrealized), i.e. net deposits at work.
-  const rangeNet = a.realizedNet + a.fundNet, rangeCap = rb.to === Infinity ? acct - rangeNet - a.unrealized : 0;
+  const rangeNet = a.realizedNet + a.fundNet;
   const rangeWr = a.winRate == null ? '' : ` · ${fmtPct(a.winRate, 0)} win rate`;
   const allRealized = d.fills.reduce((s, f) => s + n(f.closedPnl) - n(f.fee), 0) + d.funding.reduce((s, e) => s + (e.delta?.type === 'funding' ? n(e.delta.usdc) : 0), 0);
-  const allCap = acct - allRealized - a.unrealized;
+  // A simple lifetime ratio, using actual external cash flows rather than today's perps balance.
+  // Omit it if history is unavailable, any transfer is unpriced, or net deposits are nonpositive.
+  let allDepositPct = null;
+  try {
+    if (Array.isArray(d.ledger)) {
+      const flows = cashflows(d.ledger, user);
+      if (!flows.unpriced && flows.net > 0) allDepositPct = allRealized / flows.net;
+    }
+  } catch {}
   const T = (kind, when) => `${kind} <em>· ${when}</em>`;
   $('#tiles').innerHTML = [
     tile('Account value', fmtUsd(total), `perp ${fmtUsd(acct, {dec: 0})} · ${fmtUsd(Math.max(0, total - acct), {dec: 0})} idle in spot · ${fmtUsd(n(ms.totalMarginUsed), {dec: 0})} margin in use`),
-    tile(T('Realized PnL', 'all time'), fmtUsd(allRealized, {sign: true}), `closed trades, after fees and funding${allCap > 0 ? ` · <span class="${cls(allRealized)}">${allRealized > 0 ? '+' : allRealized < 0 ? '−' : ''}${fmtPct(Math.abs(allRealized / allCap))}</span> on capital` : ''}`, cls(allRealized)),
+    tile(T('Realized PnL', 'all time'), fmtUsd(allRealized, {sign: true}), `after fees and funding${allDepositPct != null ? ` · <span class="${cls(allRealized)}">${allRealized > 0 ? '+' : allRealized < 0 ? '−' : ''}${fmtPct(Math.abs(allDepositPct))}</span> of all-time net deposits` : ''}`, cls(allRealized)),
     tile(T('Unrealized PnL', 'open now'), fmtUsd(a.unrealized, {sign: true}), `${d.state.assetPositions.length} open position${d.state.assetPositions.length === 1 ? '' : 's'} at current mark`, cls(a.unrealized)),
     tile(T('Total PnL', 'all time'), fmtUsd(all.pnl, {sign: true}), `realized + unrealized · ${pctLine(all)}${fmtUsd(all.vlm, {compact: true, dec: 0})} volume`, cls(all.pnl)),
-    tile(T('Realized PnL', 'selected range'), fmtUsd(rangeNet, {sign: true}), `${rb.label} · ${rangeCap > 0 ? `<span class="${cls(rangeNet)}">${rangeNet > 0 ? '+' : rangeNet < 0 ? '−' : ''}${fmtPct(Math.abs(rangeNet / rangeCap))}</span> on capital · ` : ''}${a.count} trade${a.count === 1 ? '' : 's'}${rangeWr}`, cls(rangeNet)),
+    tile(T('Realized PnL', 'selected range'), fmtUsd(rangeNet, {sign: true}), `${rb.label} · ${a.count} trade${a.count === 1 ? '' : 's'}${rangeWr}`, cls(rangeNet)),
     tile(T('Total PnL', 'today'), fmtUsd(day.pnl, {sign: true}), `${pctLine(day)}${fmtUsd(day.vlm, {compact: true, dec: 0})} volume`, cls(day.pnl)),
     tile(T('Total PnL', '7 days'), fmtUsd(week.pnl, {sign: true}), `${pctLine(week)}${fmtUsd(week.vlm, {compact: true, dec: 0})} volume`, cls(week.pnl)),
     tile(T('Total PnL', '30 days'), fmtUsd(month.pnl, {sign: true}), `${pctLine(month)}${fmtUsd(month.vlm, {compact: true, dec: 0})} volume`, cls(month.pnl)),
