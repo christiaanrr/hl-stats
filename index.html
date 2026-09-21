@@ -96,6 +96,9 @@ td.coin{font-weight:600}
 @media (max-width:640px){.range-sum{margin-left:0;width:100%}}
 footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 .skel{color:var(--muted)}
+.summary-heading{font-size:13px;font-weight:600;color:var(--ink-2);margin:18px 0 10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.summary-heading small{font-weight:400;color:var(--muted)}
+.period-note{font-size:12px;color:var(--ink-2);margin:-4px 0 16px}
 .cashflow-stats{margin-bottom:12px}
 .cashflow-note{font-size:12px;color:var(--muted);margin:10px 0 0}
 .cashflow-details summary{cursor:pointer;color:var(--ink-2);font-size:12px;padding:10px 0}
@@ -126,11 +129,19 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
     <div class="range-sum" id="range-sum"></div>
   </div>
 
-  <section class="grid tiles" id="tiles"></section>
+  <section class="summary-section" aria-labelledby="period-heading">
+    <h2 class="summary-heading" id="period-heading">Selected period <small id="period-label"></small></h2>
+    <div class="grid tiles" id="tiles"></div>
+    <p class="period-note" id="period-note"></p>
+  </section>
+  <section class="summary-section" aria-labelledby="now-heading">
+    <h2 class="summary-heading" id="now-heading">Now <small>current balances · independent of date filter</small></h2>
+    <div class="grid two" id="now-tiles"></div>
+  </section>
 
   <section class="grid">
     <div class="card">
-      <h2>Total PnL <small>realized + unrealized, excludes deposits and withdrawals</small></h2>
+      <h2>Total PnL · selected period <small>excludes deposits and withdrawals</small></h2>
       <div class="chart" id="acct"></div>
     </div>
   </section>
@@ -192,7 +203,7 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
     </div>
   </section>
 
-  <footer>Data from the public Hyperliquid API. Closed-trade stats group fills into round trips per coin (open to flat) and are computed only from fills, fees and funding, so deposits and withdrawals never affect them. Period PnL tiles and the total PnL curve come from Hyperliquid's portfolio endpoint, which is also net of transfers.</footer>
+  <footer>Data from the public Hyperliquid API. Closed-trade stats group fills into round trips per coin (open to flat) and are computed only from fills, fees and funding, so deposits and withdrawals never affect them. Selected-period total PnL comes from Hyperliquid's portfolio history, net of transfers. Unrealized change is estimated as total PnL minus realized PnL. The Now section always shows current balances. Percentages compare PnL with net deposits in the selected period; they are not investment returns.</footer>
 </div>
 <div class="tip" id="tip"></div>
 
@@ -571,6 +582,70 @@ $('#from').onchange = onCustom; $('#to').onchange = onCustom;
 const stat = (k, v, s = '', c = '') => `<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
 const tile = (label, v, delta = '', c = '') => `<div class="card tile"><div class="label">${label}</div><div class="value ${c}">${v}</div><div class="delta">${delta}</div></div>`;
 
+// Each portfolio window has its own zero baseline. Never combine raw values from
+// different windows. Pick the shortest window that covers BOTH date boundaries.
+function periodPerformance(d, bounds) {
+  const unavailable = reason => ({total:null, points:[], reason});
+  const histories = ['perpDay', 'perpWeek', 'perpMonth', 'perpAllTime'].map(key => ({key,
+    points:(d.portfolio[key]?.pnlHistory || []).map(([t,v]) => ({t:Number(t), v:Number(v)}))
+      .filter(p => Number.isFinite(p.t) && Number.isFinite(p.v)).sort((a,b) => a.t-b.t)
+  })).filter(h => h.points.length >= 2);
+  if (!histories.length) return unavailable('Historical PnL is unavailable for this period.');
+  const latest = Math.max(...histories.map(h => h.points.at(-1).t));
+  const to = Math.min(bounds.to, latest);
+  if (bounds.from > to) return unavailable('No historical PnL is available in this date range.');
+  const history = histories.find(h => (bounds.from === -Infinity ? h.key === 'perpAllTime' : h.points[0].t <= bounds.from) && h.points.at(-1).t >= to);
+  if (!history) return unavailable('Historical PnL does not cover the start of this period.');
+  const from = bounds.from === -Infinity ? history.points[0].t : bounds.from;
+  if (to < from) return unavailable('No historical PnL is available in this date range.');
+  let interpolated = false;
+  const valueAt = time => {
+    const i = history.points.findIndex(p => p.t >= time), b = history.points[i];
+    if (b.t === time) return b.v;
+    const a = history.points[i-1];
+    interpolated = true;
+    return a.v + (b.v-a.v) * (time-a.t)/(b.t-a.t);
+  };
+  const base = valueAt(from), total = valueAt(to)-base;
+  const points = [{t:from,v:0}, ...history.points.filter(p => p.t > from && p.t < to).map(p => ({t:p.t,v:p.v-base})), {t:to,v:total}];
+  return {total, points, from, to, interpolated, reason:''};
+}
+
+function renderSummary(d, a, rb, acct, totalAccount) {
+  const realized = a.realizedNet+a.fundNet, performance = periodPerformance(d, rb);
+  let flows = null;
+  try { if (Array.isArray(d.ledger)) flows = cashflows(d.ledger, user, rb.from, rb.to); } catch {}
+  // The API exposes at most 10,000 fills; incomplete realized history cannot
+  // support a reliable decomposition of total PnL into realized/unrealized.
+  const limitedFills = d.fills.length >= 10000;
+  const newerActivity = performance.total != null && [...d.fills, ...d.funding].some(e => e.time > performance.to && e.time <= rb.to && e.time >= rb.from);
+  const unrealizedChange = performance.total == null || limitedFills || newerActivity ? null : performance.total-realized;
+  const pct = value => {
+    if (value == null) return '';
+    if (!flows || flows.unpriced || flows.net <= 0) return '<span title="A positive, fully priced net-deposit total is needed">% of period net deposits: N/A</span> · ';
+    return `<span title="${esc(fmtUsd(value))} PnL ÷ ${esc(fmtUsd(flows.net))} net deposits in this period"><span class="${cls(value)}">${value > 0 ? '+' : value < 0 ? '−' : ''}${fmtPct(Math.abs(value/flows.net))}</span> of period net deposits</span> · `;
+  };
+  const amount = (v, estimate=false) => v == null ? 'Unavailable' : (estimate ? '≈ ' : '') + fmtUsd(v, {sign:true});
+  const winRate = a.winRate == null ? '' : ` · ${fmtPct(a.winRate,0)} win rate`;
+  $('#period-label').textContent = rb.label;
+  $('#tiles').innerHTML = [
+    tile('Realized PnL', amount(realized), `${pct(realized)}after fees and funding · ${a.count} trade${a.count === 1 ? '' : 's'}${winRate}`, cls(realized)),
+    tile('Change in unrealized PnL', amount(unrealizedChange,true), `${pct(unrealizedChange)}${unrealizedChange == null ? 'Historical change cannot be calculated for this range' : 'estimated change in open profit, end minus start'}`, cls(unrealizedChange)),
+    tile('Total PnL', amount(performance.total,performance.interpolated), `${pct(performance.total)}${performance.total == null ? esc(performance.reason) : 'realized PnL + change in unrealized PnL'}`, cls(performance.total)),
+    tile('Net deposits', flows && !flows.unpriced ? amount(flows.net) : 'Unavailable', flows && !flows.unpriced ? `${fmtUsd(flows.deposits)} in − ${fmtUsd(flows.withdrawals)} out` : 'Complete USD deposit history is needed'),
+  ].join('');
+  const notes = [performance.total == null ? performance.reason : 'Unrealized change is estimated from total PnL minus realized PnL; it can differ slightly from live position data.'];
+  if (performance.interpolated) notes.push('Period boundaries are estimated between historical snapshots.');
+  if (limitedFills) notes.push('Realized PnL uses the available trade history; the API’s 10,000-fill limit prevents a reliable unrealized-change estimate.');
+  if (newerActivity) notes.push('Trading activity is newer than the latest PnL snapshot. Refresh shortly for the unrealized change.');
+  notes.push('Percentages compare PnL with net deposits in this period, not an investment return.');
+  $('#period-note').textContent = notes.join(' ');
+  $('#now-tiles').innerHTML = [
+    tile('Account value · now', fmtUsd(totalAccount), `perp ${fmtUsd(acct,{dec:0})} · ${fmtUsd(Math.max(0,totalAccount-acct),{dec:0})} idle in spot · ${fmtUsd(n(d.state.marginSummary.totalMarginUsed),{dec:0})} margin in use`),
+    tile('Unrealized PnL · open now', fmtUsd(a.unrealized,{sign:true}), `${d.state.assetPositions.length} open position${d.state.assetPositions.length === 1 ? '' : 's'} at current mark · independent of date filter`, cls(a.unrealized)),
+  ].join('');
+}
+
 function render() {
   const d = DATA, a = A, p = d.portfolio, ms = d.state.marginSummary;
   const rb = rangeBounds();
@@ -579,49 +654,12 @@ function render() {
   $('#range-sum').innerHTML = `<b>${rb.label}</b> · ${a.count} closed trade${a.count === 1 ? '' : 's'} · <span class="${cls(netInRange)}">${fmtUsd(netInRange, {sign: true})}</span> realized after fees and funding`;
   const acct = n(ms.accountValue);                                   // perp account (capital at risk)
   const total = n(p.allTime?.accountValueHistory?.at(-1)?.[1]) || acct;  // perp + spot, Hyperliquid's own total
-  const per = k => { const x = p[k];
-    const history = x?.pnlHistory || [];
-    return {pnl: history.length ? n(history.at(-1)[1]) : null, vlm: n(x?.vlm), from: history[0]?.[0], to: history.at(-1)?.[0]}; };
-  const day = per('perpDay'), week = per('perpWeek'), month = per('perpMonth'), all = per('perpAllTime');
-  const rangeNet = a.realizedNet + a.fundNet;
-  const rangeWr = a.winRate == null ? '' : ` · ${fmtPct(a.winRate, 0)} win rate`;
-  const allRealized = d.fills.reduce((s, f) => s + n(f.closedPnl) - n(f.fee), 0) + d.funding.reduce((s, e) => s + (e.delta?.type === 'funding' ? n(e.delta.usdc) : 0), 0);
-  // Match the denominator to each tile's period. Current open-position PnL has no
-  // date window, so it retains an explicitly labeled lifetime denominator.
-  const pctLine = (pnl, bounds = {from:-Infinity, to:Infinity}, lifetime = true) => {
-    const label = lifetime ? 'all-time net deposits' : 'net deposits in this period';
-    let reason = 'deposit history unavailable', netDeposits = null;
-    try {
-      if (Array.isArray(d.ledger) && bounds.from != null && bounds.to != null) {
-        const flows = cashflows(d.ledger, user, bounds.from, bounds.to);
-        if (flows.unpriced) reason = 'some transfers have no USD value';
-        else if (flows.net <= 0) reason = 'net deposits are zero or negative in this period';
-        else netDeposits = flows.net;
-      }
-    } catch {}
-    if (!Number.isFinite(pnl)) reason = 'PnL unavailable';
-    if (netDeposits == null || !Number.isFinite(pnl)) return `<span title="${esc(reason)}">% of ${label}: N/A</span> · `;
-    return `<span title="${esc(fmtUsd(pnl))} PnL ÷ ${esc(fmtUsd(netDeposits))} ${label}"><span class="${cls(pnl)}">${pnl > 0 ? '+' : pnl < 0 ? '−' : ''}${fmtPct(Math.abs(pnl / netDeposits))}</span> of ${label}</span> · `;
-  };
-  const T = (kind, when) => `${kind} <em>· ${when}</em>`;
-  $('#tiles').innerHTML = [
-    tile('Account value', fmtUsd(total), `perp ${fmtUsd(acct, {dec: 0})} · ${fmtUsd(Math.max(0, total - acct), {dec: 0})} idle in spot · ${fmtUsd(n(ms.totalMarginUsed), {dec: 0})} margin in use`),
-    tile(T('Realized PnL', 'all time'), fmtUsd(allRealized, {sign: true}), `${pctLine(allRealized)}after fees and funding`, cls(allRealized)),
-    tile(T('Unrealized PnL', 'open now'), fmtUsd(a.unrealized, {sign: true}), `${pctLine(a.unrealized)}${d.state.assetPositions.length} open position${d.state.assetPositions.length === 1 ? '' : 's'} at current mark`, cls(a.unrealized)),
-    tile(T('Total PnL', 'all time'), fmtUsd(all.pnl, {sign: true}), `realized + unrealized · ${pctLine(all.pnl)}${fmtUsd(all.vlm, {compact: true, dec: 0})} volume`, cls(all.pnl)),
-    tile(T('Realized PnL', 'selected range'), fmtUsd(rangeNet, {sign: true}), `${rb.label} · ${pctLine(rangeNet, rb, RANGE.key === 'all')}${a.count} trade${a.count === 1 ? '' : 's'}${rangeWr}`, cls(rangeNet)),
-    tile(T('Total PnL', 'today'), fmtUsd(day.pnl, {sign: true}), `${pctLine(day.pnl, day, false)}${fmtUsd(day.vlm, {compact: true, dec: 0})} volume`, cls(day.pnl)),
-    tile(T('Total PnL', '7 days'), fmtUsd(week.pnl, {sign: true}), `${pctLine(week.pnl, week, false)}${fmtUsd(week.vlm, {compact: true, dec: 0})} volume`, cls(week.pnl)),
-    tile(T('Total PnL', '30 days'), fmtUsd(month.pnl, {sign: true}), `${pctLine(month.pnl, month, false)}${fmtUsd(month.vlm, {compact: true, dec: 0})} volume`, cls(month.pnl)),
-  ].join('');
+  renderSummary(d, a, rb, acct, total);
 
-  // Hyperliquid's pnlHistory is account value minus net transfers, so deposits/withdrawals never show up here.
-  const pnlAll = (p.perpAllTime?.pnlHistory || []).map(([t, v]) => ({t, v: n(v)}));
-  const anchor = pnlAll.filter(pt => pt.t < rb.from).at(-1);
-  const base = anchor ? anchor.v : 0;
-  const pnlHist = pnlAll.filter(pt => pt.t >= rb.from && pt.t <= rb.to).map(pt => ({t: pt.t, v: pt.v - base}));
-  if (anchor) pnlHist.unshift({t: rb.from, v: 0});
-  lineChart($('#acct'), [{name: 'Total PnL', color: 'var(--accent)', points: pnlHist, fill: true}], rb.to, rb.from);
+  // The chart and total-PnL tile share the same history and boundary values.
+  const performance = periodPerformance(d, rb);
+  if (performance.total == null) $('#acct').innerHTML = `<div class="empty">${esc(performance.reason)}</div>`;
+  else lineChart($('#acct'), [{name:'Total PnL', color:'var(--accent)', points:performance.points, fill:true}], performance.to, performance.from);
   const firstFill = d.fills[0]?.time ?? Date.now();
   const dFrom = Math.max(rb.from, firstFill), dTo = Math.min(rb.to, Date.now());
   const dayNet = {}; for (const t of a.trades) { const k = dayKey(t.close); dayNet[k] = (dayNet[k] || 0) + t.net; }
@@ -761,7 +799,7 @@ function askForWallet(msg) {
   $('.filters').hidden = true; $('#tiles').innerHTML = ''; $('#refresh').hidden = true;
   const s = $('#status'); s.hidden = false; s.className = 'status load';
   s.innerHTML = `<form id="wallet-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span>${msg}</span><input id="wallet" placeholder="0x…" style="font:inherit;font-family:ui-monospace,Menlo,monospace;flex:1;min-width:260px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><button type="submit">Open</button></form>`;
-  document.querySelectorAll('section.grid, footer').forEach(el => el.hidden = true);
+  document.querySelectorAll('section.grid, .summary-section, footer').forEach(el => el.hidden = true);
   $('#wallet-form').onsubmit = e => { e.preventDefault(); const v = $('#wallet').value.trim(); if (/^0x[0-9a-fA-F]{40}$/.test(v)) location.search = '?user=' + v; else $('#wallet').style.borderColor = 'var(--bad)'; };
 }
 if (!user) askForWallet('Enter a Hyperliquid wallet address to view its stats.');
