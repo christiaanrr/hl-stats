@@ -98,23 +98,19 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 .skel{color:var(--muted)}
 .summary-heading{font-size:13px;font-weight:600;color:var(--ink-2);margin:18px 0 10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .summary-heading small{font-weight:400;color:var(--muted)}
-.period-note{font-size:12px;color:var(--ink-2);margin:8px 0 0;line-height:1.6;max-width:900px}
-.calculation-details{margin:-3px 0 18px;color:var(--muted);font-size:12px}
-.calculation-details summary{cursor:pointer;width:fit-content}
-.calculation-details summary:hover{color:var(--ink-2)}
-.account-overview{grid-template-columns:1.65fr 1fr;margin:0 0 24px}
-.account-overview .tile{padding:22px 24px}
+.account-overview{grid-template-columns:1.65fr 1fr;margin:0 0 18px}
+.account-overview .tile{padding:16px 18px}
 .account-overview .tile:first-child{border-color:rgba(11,11,11,.16)}
 .account-overview .label{font-size:13px}
-.account-overview .value{font-size:32px;line-height:1.2;margin:10px 0 14px}
-.account-overview .tile:first-child .value{font-size:44px;letter-spacing:-.035em}
-.balance-breakdown{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.account-overview .value{font-size:24px;line-height:1.2;margin:6px 0 8px}
+.account-overview .tile:first-child .value{font-size:30px;letter-spacing:-.025em}
+.balance-breakdown{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
 .balance-breakdown span{display:block;font-size:11px;color:var(--muted)}
-.balance-breakdown strong{display:block;margin-top:3px;font-size:15px;font-weight:500;color:var(--ink-2)}
+.balance-breakdown strong{display:block;margin-top:3px;font-size:13px;font-weight:500;color:var(--ink-2)}
 .tile-ratio{display:block;margin-bottom:5px;color:var(--ink-2)}
 #tiles .value{margin:8px 0 10px}
 #tiles .delta{line-height:1.6}
-@media (max-width:640px){.account-overview{grid-template-columns:1fr;gap:10px}.account-overview .tile{padding:18px 20px}.account-overview .tile:first-child .value{font-size:38px}.account-overview .value{font-size:28px}.balance-breakdown{gap:8px}}
+@media (max-width:640px){.account-overview{grid-template-columns:1fr;gap:10px}.account-overview .tile{padding:14px 16px}.account-overview .tile:first-child .value{font-size:28px}.account-overview .value{font-size:24px}.balance-breakdown{gap:8px}}
 .cashflow-stats{margin-bottom:12px}
 .cashflow-note{font-size:12px;color:var(--muted);margin:10px 0 0}
 .cashflow-details summary{cursor:pointer;color:var(--ink-2);font-size:12px;padding:10px 0}
@@ -136,10 +132,6 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 
   <div id="status" class="status load">Loading account data…</div>
 
-  <section class="summary-section" aria-label="Current account overview">
-    <div class="grid account-overview" id="now-tiles"></div>
-  </section>
-
   <div class="filters" id="filters">
     <div class="seg" id="presets">
       <button data-r="7">7D</button><button data-r="30">30D</button><button data-r="90">90D</button><button data-r="ytd">YTD</button><button data-r="all">All time</button><button data-r="since" class="since" id="since-btn" hidden></button>
@@ -149,13 +141,13 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
     <div class="range-sum" id="range-sum"></div>
   </div>
 
+  <section class="summary-section" aria-label="Current account overview">
+    <div class="grid account-overview" id="now-tiles"></div>
+  </section>
+
   <section class="summary-section" aria-labelledby="period-heading">
     <h2 class="summary-heading" id="period-heading">Selected period <small id="period-label"></small></h2>
     <div class="grid tiles" id="tiles"></div>
-    <details class="calculation-details">
-      <summary>About these calculations</summary>
-      <p class="period-note" id="period-note"></p>
-    </details>
   </section>
 
   <section class="grid">
@@ -222,7 +214,7 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
     </div>
   </section>
 
-  <footer>Data from the public Hyperliquid API. Closed-trade stats group fills into round trips per coin (open to flat) and are computed only from fills, fees and funding, so deposits and withdrawals never affect them. Selected-period total PnL comes from Hyperliquid's portfolio history, net of transfers. Unrealized change is estimated as total PnL minus realized PnL. The account overview always shows current balances. Percentages compare PnL with net deposits in the selected period; they are not investment returns.</footer>
+  <footer>Data from the public Hyperliquid API. Closed-trade stats group fills into round trips per coin (open to flat) and are computed only from fills, fees and funding, so deposits and withdrawals never affect them. Selected-period total PnL comes from Hyperliquid's portfolio history, net of transfers. The account overview always shows current balances. <span id="period-note"></span></footer>
 </div>
 <div class="tip" id="tip"></div>
 
