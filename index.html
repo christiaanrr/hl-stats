@@ -96,6 +96,13 @@ td.coin{font-weight:600}
 @media (max-width:640px){.range-sum{margin-left:0;width:100%}}
 footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 .skel{color:var(--muted)}
+.cashflow-stats{margin-bottom:12px}
+.cashflow-note{font-size:12px;color:var(--muted);margin:10px 0 0}
+.cashflow-details summary{cursor:pointer;color:var(--ink-2);font-size:12px;padding:10px 0}
+.cashflow-details th{cursor:default}
+.cashflow-details a{color:var(--accent);text-decoration:none}
+.cashflow-details a:hover{text-decoration:underline}
+@media (max-width:480px){.cashflow-stats{grid-template-columns:1fr}.cashflow-card h2{flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -125,6 +132,13 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
     <div class="card">
       <h2>Total PnL <small>realized + unrealized, excludes deposits and withdrawals</small></h2>
       <div class="chart" id="acct"></div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card cashflow-card">
+      <h2>Deposits &amp; withdrawals <small id="cashflow-sub">in selected range</small></h2>
+      <div id="cashflow"><div class="empty">Loading deposit and withdrawal history…</div></div>
     </div>
   </section>
 
@@ -238,17 +252,67 @@ async function paged(type, pageSize, keyFn) {
   }
   return out.sort((a,b) => a.time - b.time);
 }
+async function loadLedger() {
+  const seen = new Set(), out = [], endTime = Date.now();
+  let startTime = 0;
+  for (let i = 0; i < 100; i++) {
+    const page = await info({type:'userNonFundingLedgerUpdates', user, startTime, endTime});
+    if (!Array.isArray(page)) throw new Error('Invalid ledger response');
+    let last = startTime;
+    for (const e of page) {
+      if (!Number.isFinite(e.time) || !e.delta) throw new Error('Invalid ledger entry');
+      const key = JSON.stringify([e.time, e.hash, e.delta]);
+      if (!seen.has(key)) { seen.add(key); out.push(e); }
+      last = Math.max(last, e.time);
+    }
+    // Time-range responses can be capped at 500 entries or distinct blocks.
+    if (page.length < 500) return out.sort((a,b) => a.time - b.time);
+    if (last <= startTime) throw new Error('Ledger pagination did not advance');
+    startTime = last; // Inclusive boundary; the next page is deduplicated above.
+  }
+  throw new Error('Ledger history exceeds pagination limit');
+}
 async function loadAll() {
-  const [state, portfolio, fills, funding] = await Promise.all([
+  const [state, portfolio, fills, funding, ledger] = await Promise.all([
     info({type:'clearinghouseState', user}),
     info({type:'portfolio', user}),
     paged('userFillsByTime', 2000, f => f.tid),
     paged('userFunding', 500, f => f.time + ':' + f.delta.coin),
+    loadLedger().catch(() => null), // A ledger outage must not hide the trading dashboard.
   ]);
-  return {ts: Date.now(), state, portfolio: Object.fromEntries(portfolio), fills, funding};
+  return {ts: Date.now(), state, portfolio: Object.fromEntries(portfolio), fills, funding, ledger};
 }
 
 /* ---------- analytics ---------- */
+function cashflows(ledger, address, from = -Infinity, to = Infinity) {
+  const wallet = address.toLowerCase(), rows = [];
+  const amount = value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
+  for (const e of ledger) {
+    if (e.time < from || e.time > to) continue;
+    const d = e.delta || {};
+    let incoming, label, token = 'USDC', quantity, usd;
+    if (d.type === 'deposit' || d.type === 'withdraw') {
+      incoming = d.type === 'deposit';
+      label = incoming ? 'Deposit' : 'Withdrawal';
+      quantity = usd = amount(d.usdc);
+    } else if (['send', 'spotTransfer', 'internalTransfer', 'subAccountTransfer'].includes(d.type)) {
+      const sender = String(d.user || '').toLowerCase(), recipient = String(d.destination || '').toLowerCase();
+      // Ignore movements within this wallet and entries unrelated to it.
+      if (sender === recipient || (sender !== wallet && recipient !== wallet)) continue;
+      incoming = recipient === wallet;
+      label = incoming ? 'Transfer in' : 'Transfer out';
+      token = d.token || 'USDC';
+      quantity = amount(d.amount ?? d.usdc);
+      usd = token === 'USDC' ? quantity : amount(d.usdcValue);
+    } else continue;
+    if (quantity == null || quantity < 0) throw new Error('Invalid transfer amount');
+    if (usd != null && usd < 0) throw new Error('Invalid transfer value');
+    rows.push({time:e.time, hash:e.hash, incoming, label, token, quantity, usd});
+  }
+  const deposits = rows.filter(r => r.incoming).reduce((s,r) => s + (r.usd ?? 0), 0);
+  const withdrawals = rows.filter(r => !r.incoming).reduce((s,r) => s + (r.usd ?? 0), 0);
+  return {rows:rows.sort((a,b) => b.time - a.time), deposits, withdrawals, net:deposits-withdrawals, unpriced:rows.some(r => r.usd == null)};
+}
 function roundTrips(fills) {
   const byCoin = {};
   const trades = [];
@@ -479,7 +543,7 @@ function histogram(container, values) {
 }
 
 /* ---------- render ---------- */
-let DATA = null, A = null, sortKey = 'net', sortDir = -1, LOG_ALL = false;
+let DATA = null, A = null, sortKey = 'net', sortDir = -1, LOG_ALL = false, CASHFLOW_ALL = false;
 let RANGE = {key: 'all', from: '', to: ''};
 try { const r = JSON.parse(localStorage.getItem('hl-range')); if (r && r.key) RANGE = r; } catch {}
 const startOfDay = d => { d = new Date(d); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -590,9 +654,39 @@ function render() {
     stat('Total volume', fmtUsd(a.totalVol, {compact: true, dec: 0}), `${a.fillCount} fills · ${a.coins.filter(c => c.trades || c.open).length} coins`),
   ].join('');
 
+  renderCashflow();
   renderCoinTable();
   renderTradeLog();
   renderPositions();
+}
+
+function renderCashflow() {
+  const container = $('#cashflow'), rb = rangeBounds();
+  const wasOpen = container.querySelector('details')?.open || false;
+  $('#cashflow-sub').textContent = rb.label;
+  let flow;
+  try {
+    if (!Array.isArray(DATA.ledger)) throw new Error('Ledger unavailable');
+    flow = cashflows(DATA.ledger, user, rb.from, rb.to);
+  } catch {
+    container.innerHTML = '<div class="empty">Deposit and withdrawal history is unavailable. Click Refresh to try again.</div>';
+    return;
+  }
+  const {rows, deposits, withdrawals, net, unpriced} = flow;
+  const inCount = rows.filter(r => r.incoming).length, outCount = rows.length - inCount;
+  const suffix = unpriced ? ' · priced transfers only' : '';
+  const stats = `<div class="stats cashflow-stats">${stat('Deposits / money in', fmtUsd(deposits), `${inCount} incoming transaction${inCount === 1 ? '' : 's'}${suffix}`, 'pos')}${stat('Withdrawals / money out', fmtUsd(withdrawals), `${outCount} outgoing transaction${outCount === 1 ? '' : 's'}${suffix}`)}${stat('Net deposits', fmtUsd(net, {sign:true}), 'Money in minus money out' + suffix)}</div>`;
+  const shown = CASHFLOW_ALL ? rows : rows.slice(0, 10);
+  const body = shown.map(r => {
+    const date = new Date(r.time).toLocaleString('en-US', {year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+    const link = /^0x[0-9a-fA-F]{64}$/.test(r.hash || '') ? `<a href="https://app.hyperliquid.xyz/explorer/tx/${r.hash}" target="_blank" rel="noopener noreferrer" aria-label="View transaction ${r.hash}">View ↗</a>` : '–';
+    return `<tr><td>${esc(date)}</td><td class="left">${esc(r.label)}</td><td>${fmtNum(r.quantity, 8)} ${esc(r.token)}</td><td class="${r.incoming ? 'pos' : ''}">${r.usd == null ? 'Unavailable' : fmtUsd(r.incoming ? r.usd : -r.usd, {sign:true})}</td><td>${link}</td></tr>`;
+  }).join('');
+  const more = rows.length > 10 ? `<div class="more"><button id="cashflow-more">${CASHFLOW_ALL ? 'Show fewer' : `Show all ${rows.length} transactions`}</button></div>` : '';
+  const history = rows.length ? `<details class="cashflow-details" ${wasOpen ? 'open' : ''}><summary>View ${rows.length} transaction${rows.length === 1 ? '' : 's'}</summary><div class="tbl"><table><thead><tr><th scope="col">Date · local time</th><th scope="col" class="left">Type</th><th scope="col">Amount</th><th scope="col">USD value</th><th scope="col">Transaction</th></tr></thead><tbody>${body}</tbody></table></div>${more}</details>` : '<div class="empty">No deposits or withdrawals in this date range.</div>';
+  container.innerHTML = stats + history + '<p class="cashflow-note">Includes transfers to and from other wallets. Moves within this wallet and vault activity are excluded. Token transfers use their USD value at the time; amounts are as reported, without a separate fee adjustment. These totals do not affect PnL.</p>';
+  const button = $('#cashflow-more');
+  if (button) button.onclick = () => { CASHFLOW_ALL = !CASHFLOW_ALL; renderCashflow(); };
 }
 
 function renderCoinTable() {
