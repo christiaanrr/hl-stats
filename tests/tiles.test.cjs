@@ -56,7 +56,7 @@ test('four period tiles reconcile and share the selected net-deposit denominator
   const {tiles,now}=render();
   assert.equal(tiles.length,4);
   assert.ok(tiles[0].includes('+$80.00'));
-  assert.ok(tiles[1].includes('≈ +$70.00'));
+  assert.ok(tiles[1].includes('+$70.00'));
   assert.ok(tiles[2].includes('+$150.00'));
   assert.ok(tiles[3].includes('+$300.00'));
   assert.ok(tiles[0].includes('+26.7%'));
@@ -70,7 +70,7 @@ test('changing dates updates period totals and deposits while live balances stay
   const {render}=setup();
   const before=render(),after=render(10,20,30);
   assert.ok(after.tiles[0].includes('+$30.00'));
-  assert.ok(after.tiles[1].includes('≈ +$70.00'));
+  assert.ok(after.tiles[1].includes('+$70.00'));
   assert.ok(after.tiles[2].includes('+$100.00'));
   assert.ok(after.tiles[3].includes('−$200.00'));
   assert.ok(after.tiles[0].includes('N/A'));
@@ -80,7 +80,7 @@ test('closing a profitable position can reduce unrealized PnL without being a lo
   const {render}=setup();
   const {tiles}=render(10,20,180);
   assert.ok(tiles[0].includes('+$180.00'));
-  assert.ok(tiles[1].includes('≈ −$80.00'));
+  assert.ok(tiles[1].includes('−$80.00'));
   assert.ok(tiles[2].includes('+$100.00'));
 });
 test('missing/unpriced deposits suppress percentages, not profit amounts',()=>{

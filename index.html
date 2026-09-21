@@ -98,7 +98,23 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 .skel{color:var(--muted)}
 .summary-heading{font-size:13px;font-weight:600;color:var(--ink-2);margin:18px 0 10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .summary-heading small{font-weight:400;color:var(--muted)}
-.period-note{font-size:12px;color:var(--ink-2);margin:-4px 0 16px}
+.period-note{font-size:12px;color:var(--ink-2);margin:8px 0 0;line-height:1.6;max-width:900px}
+.calculation-details{margin:-3px 0 18px;color:var(--muted);font-size:12px}
+.calculation-details summary{cursor:pointer;width:fit-content}
+.calculation-details summary:hover{color:var(--ink-2)}
+.account-overview{grid-template-columns:1.65fr 1fr;margin:0 0 24px}
+.account-overview .tile{padding:22px 24px}
+.account-overview .tile:first-child{border-color:rgba(11,11,11,.16)}
+.account-overview .label{font-size:13px}
+.account-overview .value{font-size:32px;line-height:1.2;margin:10px 0 14px}
+.account-overview .tile:first-child .value{font-size:44px;letter-spacing:-.035em}
+.balance-breakdown{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.balance-breakdown span{display:block;font-size:11px;color:var(--muted)}
+.balance-breakdown strong{display:block;margin-top:3px;font-size:15px;font-weight:500;color:var(--ink-2)}
+.tile-ratio{display:block;margin-bottom:5px;color:var(--ink-2)}
+#tiles .value{margin:8px 0 10px}
+#tiles .delta{line-height:1.6}
+@media (max-width:640px){.account-overview{grid-template-columns:1fr;gap:10px}.account-overview .tile{padding:18px 20px}.account-overview .tile:first-child .value{font-size:38px}.account-overview .value{font-size:28px}.balance-breakdown{gap:8px}}
 .cashflow-stats{margin-bottom:12px}
 .cashflow-note{font-size:12px;color:var(--muted);margin:10px 0 0}
 .cashflow-details summary{cursor:pointer;color:var(--ink-2);font-size:12px;padding:10px 0}
@@ -120,6 +136,10 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
 
   <div id="status" class="status load">Loading account data…</div>
 
+  <section class="summary-section" aria-label="Current account overview">
+    <div class="grid account-overview" id="now-tiles"></div>
+  </section>
+
   <div class="filters" id="filters">
     <div class="seg" id="presets">
       <button data-r="7">7D</button><button data-r="30">30D</button><button data-r="90">90D</button><button data-r="ytd">YTD</button><button data-r="all">All time</button><button data-r="since" class="since" id="since-btn" hidden></button>
@@ -132,11 +152,10 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
   <section class="summary-section" aria-labelledby="period-heading">
     <h2 class="summary-heading" id="period-heading">Selected period <small id="period-label"></small></h2>
     <div class="grid tiles" id="tiles"></div>
-    <p class="period-note" id="period-note"></p>
-  </section>
-  <section class="summary-section" aria-labelledby="now-heading">
-    <h2 class="summary-heading" id="now-heading">Now <small>current balances · independent of date filter</small></h2>
-    <div class="grid two" id="now-tiles"></div>
+    <details class="calculation-details">
+      <summary>About these calculations</summary>
+      <p class="period-note" id="period-note"></p>
+    </details>
   </section>
 
   <section class="grid">
@@ -203,7 +222,7 @@ footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
     </div>
   </section>
 
-  <footer>Data from the public Hyperliquid API. Closed-trade stats group fills into round trips per coin (open to flat) and are computed only from fills, fees and funding, so deposits and withdrawals never affect them. Selected-period total PnL comes from Hyperliquid's portfolio history, net of transfers. Unrealized change is estimated as total PnL minus realized PnL. The Now section always shows current balances. Percentages compare PnL with net deposits in the selected period; they are not investment returns.</footer>
+  <footer>Data from the public Hyperliquid API. Closed-trade stats group fills into round trips per coin (open to flat) and are computed only from fills, fees and funding, so deposits and withdrawals never affect them. Selected-period total PnL comes from Hyperliquid's portfolio history, net of transfers. Unrealized change is estimated as total PnL minus realized PnL. The account overview always shows current balances. Percentages compare PnL with net deposits in the selected period; they are not investment returns.</footer>
 </div>
 <div class="tip" id="tip"></div>
 
@@ -622,16 +641,16 @@ function renderSummary(d, a, rb, acct, totalAccount) {
   const unrealizedChange = performance.total == null || limitedFills || newerActivity ? null : performance.total-realized;
   const pct = value => {
     if (value == null) return '';
-    if (!flows || flows.unpriced || flows.net <= 0) return '<span title="A positive, fully priced net-deposit total is needed">% of period net deposits: N/A</span> · ';
-    return `<span title="${esc(fmtUsd(value))} PnL ÷ ${esc(fmtUsd(flows.net))} net deposits in this period"><span class="${cls(value)}">${value > 0 ? '+' : value < 0 ? '−' : ''}${fmtPct(Math.abs(value/flows.net))}</span> of period net deposits</span> · `;
+    if (!flows || flows.unpriced || flows.net <= 0) return '<span class="tile-ratio" title="A positive, fully priced net-deposit total is needed">% of period net deposits: N/A</span>';
+    return `<span class="tile-ratio" title="${esc(fmtUsd(value))} PnL ÷ ${esc(fmtUsd(flows.net))} net deposits in this period"><span class="${cls(value)}">${value > 0 ? '+' : value < 0 ? '−' : ''}${fmtPct(Math.abs(value/flows.net))}</span> of period net deposits</span>`;
   };
-  const amount = (v, estimate=false) => v == null ? 'Unavailable' : (estimate ? '≈ ' : '') + fmtUsd(v, {sign:true});
+  const amount = v => v == null ? 'Unavailable' : fmtUsd(v, {sign:true});
   const winRate = a.winRate == null ? '' : ` · ${fmtPct(a.winRate,0)} win rate`;
   $('#period-label').textContent = rb.label;
   $('#tiles').innerHTML = [
     tile('Realized PnL', amount(realized), `${pct(realized)}after fees and funding · ${a.count} trade${a.count === 1 ? '' : 's'}${winRate}`, cls(realized)),
-    tile('Change in unrealized PnL', amount(unrealizedChange,true), `${pct(unrealizedChange)}${unrealizedChange == null ? 'Historical change cannot be calculated for this range' : 'estimated change in open profit, end minus start'}`, cls(unrealizedChange)),
-    tile('Total PnL', amount(performance.total,performance.interpolated), `${pct(performance.total)}${performance.total == null ? esc(performance.reason) : 'realized PnL + change in unrealized PnL'}`, cls(performance.total)),
+    tile('Change in unrealized PnL', amount(unrealizedChange), `${pct(unrealizedChange)}${unrealizedChange == null ? 'Historical change cannot be calculated for this range' : 'open profit at end minus start'}`, cls(unrealizedChange)),
+    tile('Total PnL', amount(performance.total), `${pct(performance.total)}${performance.total == null ? esc(performance.reason) : 'realized PnL + change in unrealized PnL'}`, cls(performance.total)),
     tile('Net deposits', flows && !flows.unpriced ? amount(flows.net) : 'Unavailable', flows && !flows.unpriced ? `${fmtUsd(flows.deposits)} in − ${fmtUsd(flows.withdrawals)} out` : 'Complete USD deposit history is needed'),
   ].join('');
   const notes = [performance.total == null ? performance.reason : 'Unrealized change is estimated from total PnL minus realized PnL; it can differ slightly from live position data.'];
@@ -641,8 +660,8 @@ function renderSummary(d, a, rb, acct, totalAccount) {
   notes.push('Percentages compare PnL with net deposits in this period, not an investment return.');
   $('#period-note').textContent = notes.join(' ');
   $('#now-tiles').innerHTML = [
-    tile('Account value · now', fmtUsd(totalAccount), `perp ${fmtUsd(acct,{dec:0})} · ${fmtUsd(Math.max(0,totalAccount-acct),{dec:0})} idle in spot · ${fmtUsd(n(d.state.marginSummary.totalMarginUsed),{dec:0})} margin in use`),
-    tile('Unrealized PnL · open now', fmtUsd(a.unrealized,{sign:true}), `${d.state.assetPositions.length} open position${d.state.assetPositions.length === 1 ? '' : 's'} at current mark · independent of date filter`, cls(a.unrealized)),
+    tile('Account value · now', fmtUsd(totalAccount), `<div class="balance-breakdown"><div><span>Perps balance</span><strong>${fmtUsd(acct)}</strong></div><div><span>Spot balance</span><strong>${fmtUsd(Math.max(0,totalAccount-acct))}</strong></div><div><span>Margin in use</span><strong>${fmtUsd(n(d.state.marginSummary.totalMarginUsed))}</strong></div></div>`),
+    tile('Unrealized PnL · open now', fmtUsd(a.unrealized,{sign:true}), `${d.state.assetPositions.length} open position${d.state.assetPositions.length === 1 ? '' : 's'} at current mark<br>Current snapshot · not affected by the date filter`, cls(a.unrealized)),
   ].join('');
 }
 
