@@ -580,32 +580,39 @@ function render() {
   const acct = n(ms.accountValue);                                   // perp account (capital at risk)
   const total = n(p.allTime?.accountValueHistory?.at(-1)?.[1]) || acct;  // perp + spot, Hyperliquid's own total
   const per = k => { const x = p[k];
-    return {pnl: x?.pnlHistory?.length ? n(x.pnlHistory.at(-1)[1]) : null, vlm: n(x?.vlm)}; };
+    const history = x?.pnlHistory || [];
+    return {pnl: history.length ? n(history.at(-1)[1]) : null, vlm: n(x?.vlm), from: history[0]?.[0], to: history.at(-1)?.[0]}; };
   const day = per('perpDay'), week = per('perpWeek'), month = per('perpMonth'), all = per('perpAllTime');
   const rangeNet = a.realizedNet + a.fundNet;
   const rangeWr = a.winRate == null ? '' : ` · ${fmtPct(a.winRate, 0)} win rate`;
   const allRealized = d.fills.reduce((s, f) => s + n(f.closedPnl) - n(f.fee), 0) + d.funding.reduce((s, e) => s + (e.delta?.type === 'funding' ? n(e.delta.usdc) : 0), 0);
-  // Every PnL tile uses the same actual lifetime net deposits as its denominator.
-  // Only the selected-range numerator changes with the date filter; fixed-period tiles keep their periods.
-  // Omit it if history is unavailable, any transfer is unpriced, or net deposits are nonpositive.
-  let netDeposits = null;
-  try {
-    if (Array.isArray(d.ledger)) {
-      const flows = cashflows(d.ledger, user);
-      if (!flows.unpriced && flows.net > 0) netDeposits = flows.net;
-    }
-  } catch {}
-  const pctLine = pnl => netDeposits == null || !Number.isFinite(pnl) ? '' : `<span title="${esc(fmtUsd(pnl))} PnL ÷ ${esc(fmtUsd(netDeposits))} all-time net deposits"><span class="${cls(pnl)}">${pnl > 0 ? '+' : pnl < 0 ? '−' : ''}${fmtPct(Math.abs(pnl / netDeposits))}</span> of all-time net deposits</span> · `;
+  // Match the denominator to each tile's period. Current open-position PnL has no
+  // date window, so it retains an explicitly labeled lifetime denominator.
+  const pctLine = (pnl, bounds = {from:-Infinity, to:Infinity}, lifetime = true) => {
+    const label = lifetime ? 'all-time net deposits' : 'net deposits in this period';
+    let reason = 'deposit history unavailable', netDeposits = null;
+    try {
+      if (Array.isArray(d.ledger) && bounds.from != null && bounds.to != null) {
+        const flows = cashflows(d.ledger, user, bounds.from, bounds.to);
+        if (flows.unpriced) reason = 'some transfers have no USD value';
+        else if (flows.net <= 0) reason = 'net deposits are zero or negative in this period';
+        else netDeposits = flows.net;
+      }
+    } catch {}
+    if (!Number.isFinite(pnl)) reason = 'PnL unavailable';
+    if (netDeposits == null || !Number.isFinite(pnl)) return `<span title="${esc(reason)}">% of ${label}: N/A</span> · `;
+    return `<span title="${esc(fmtUsd(pnl))} PnL ÷ ${esc(fmtUsd(netDeposits))} ${label}"><span class="${cls(pnl)}">${pnl > 0 ? '+' : pnl < 0 ? '−' : ''}${fmtPct(Math.abs(pnl / netDeposits))}</span> of ${label}</span> · `;
+  };
   const T = (kind, when) => `${kind} <em>· ${when}</em>`;
   $('#tiles').innerHTML = [
     tile('Account value', fmtUsd(total), `perp ${fmtUsd(acct, {dec: 0})} · ${fmtUsd(Math.max(0, total - acct), {dec: 0})} idle in spot · ${fmtUsd(n(ms.totalMarginUsed), {dec: 0})} margin in use`),
     tile(T('Realized PnL', 'all time'), fmtUsd(allRealized, {sign: true}), `${pctLine(allRealized)}after fees and funding`, cls(allRealized)),
     tile(T('Unrealized PnL', 'open now'), fmtUsd(a.unrealized, {sign: true}), `${pctLine(a.unrealized)}${d.state.assetPositions.length} open position${d.state.assetPositions.length === 1 ? '' : 's'} at current mark`, cls(a.unrealized)),
     tile(T('Total PnL', 'all time'), fmtUsd(all.pnl, {sign: true}), `realized + unrealized · ${pctLine(all.pnl)}${fmtUsd(all.vlm, {compact: true, dec: 0})} volume`, cls(all.pnl)),
-    tile(T('Realized PnL', 'selected range'), fmtUsd(rangeNet, {sign: true}), `${rb.label} · ${pctLine(rangeNet)}${a.count} trade${a.count === 1 ? '' : 's'}${rangeWr}`, cls(rangeNet)),
-    tile(T('Total PnL', 'today'), fmtUsd(day.pnl, {sign: true}), `${pctLine(day.pnl)}${fmtUsd(day.vlm, {compact: true, dec: 0})} volume`, cls(day.pnl)),
-    tile(T('Total PnL', '7 days'), fmtUsd(week.pnl, {sign: true}), `${pctLine(week.pnl)}${fmtUsd(week.vlm, {compact: true, dec: 0})} volume`, cls(week.pnl)),
-    tile(T('Total PnL', '30 days'), fmtUsd(month.pnl, {sign: true}), `${pctLine(month.pnl)}${fmtUsd(month.vlm, {compact: true, dec: 0})} volume`, cls(month.pnl)),
+    tile(T('Realized PnL', 'selected range'), fmtUsd(rangeNet, {sign: true}), `${rb.label} · ${pctLine(rangeNet, rb, RANGE.key === 'all')}${a.count} trade${a.count === 1 ? '' : 's'}${rangeWr}`, cls(rangeNet)),
+    tile(T('Total PnL', 'today'), fmtUsd(day.pnl, {sign: true}), `${pctLine(day.pnl, day, false)}${fmtUsd(day.vlm, {compact: true, dec: 0})} volume`, cls(day.pnl)),
+    tile(T('Total PnL', '7 days'), fmtUsd(week.pnl, {sign: true}), `${pctLine(week.pnl, week, false)}${fmtUsd(week.vlm, {compact: true, dec: 0})} volume`, cls(week.pnl)),
+    tile(T('Total PnL', '30 days'), fmtUsd(month.pnl, {sign: true}), `${pctLine(month.pnl, month, false)}${fmtUsd(month.vlm, {compact: true, dec: 0})} volume`, cls(month.pnl)),
   ].join('');
 
   // Hyperliquid's pnlHistory is account value minus net transfers, so deposits/withdrawals never show up here.
