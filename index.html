@@ -37,13 +37,18 @@
     </section>
 
     <section class="panel chart-panel" aria-label="Portfolio chart">
+      <header class="chart-header">
       <div class="chart-toolbar">
         <div class="tabs" id="chart-tabs" role="tablist" aria-label="Chart view"><button id="chart-tab-perps" role="tab" aria-selected="true" aria-controls="chart-plot" data-chart="perps">Perps</button><button id="chart-tab-combined" role="tab" aria-selected="false" aria-controls="chart-plot" data-chart="combined" tabindex="-1">Combined</button><button id="chart-tab-calendar" role="tab" aria-selected="false" aria-controls="chart-calendar" data-chart="calendar" tabindex="-1">Calendar</button></div>
-        <div class="chart-options"><button data-metric="pnl" class="on" aria-pressed="true">PnL</button><button data-metric="value" aria-pressed="false">Value</button><span class="divider"></span><button data-range="1">24H</button><button data-range="7">7D</button><button data-range="30">30D</button><button data-range="all">All</button><span class="divider"></span><button id="toggle-dates" aria-controls="filters" aria-expanded="false">Dates</button></div>
+        <div class="chart-options"><button data-metric="pnl" class="on" aria-pressed="true">PnL</button><button data-metric="value" aria-pressed="false">Value</button></div>
       </div>
+      <div class="chart-filters" id="filters" role="group" aria-label="Chart date filters">
+        <div class="seg" id="presets"><button data-range="1">24H</button><button data-range="7">7D</button><button data-range="30">30D</button><button data-range="90">90D</button><button data-range="ytd">YTD</button><button data-range="all">All</button><button data-range="since" class="since" id="since-btn" hidden></button></div>
+        <div class="date-range" role="group" aria-label="Custom date range"><label class="range">From <input type="date" id="from" aria-label="From date"></label><label class="range">To <input type="date" id="to" aria-label="To date"></label></div>
+      </div>
+      </header>
       <div id="chart-plot" role="tabpanel" aria-labelledby="chart-tab-perps"><div class="chart-caption"><h2 id="chart-title">Perps PnL</h2><div class="chart-value" id="chart-value">–</div></div><div class="chart" id="acct"></div><div class="sr-only" id="chart-note">PnL excludes deposits and withdrawals.</div></div>
       <div id="chart-calendar" class="chart-calendar" role="tabpanel" aria-labelledby="chart-tab-calendar" hidden><div id="hero-calendar"></div></div>
-      <div class="filters" id="filters" hidden><details open><summary>Date filters <span aria-hidden="true">⌄</span></summary><div class="date-tools"><div class="seg" id="presets"><button data-r="1">24H</button><button data-r="7">7D</button><button data-r="30">30D</button><button data-r="90">90D</button><button data-r="ytd">YTD</button><button data-r="all">All time</button><button data-r="since" class="since" id="since-btn" hidden></button></div><label class="range">From <input type="date" id="from"></label><label class="range">To <input type="date" id="to"></label></div></details><div class="range-sum" id="range-sum"></div></div>
     </section>
 
     <section class="panel positions-panel" id="positions-section" aria-label="Account tables">
@@ -384,11 +389,12 @@ function rangeBounds() {
 }
 function setRange(r) { RANGE = r; try { localStorage.setItem('hl-range', JSON.stringify(r)); } catch {} if (DATA) { A = analyze(DATA, rangeBounds().from, rangeBounds().to); render(); } else syncFilters(); }
 function syncFilters() {
-  $('#presets').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.r === RANGE.key));
+  $('#presets').querySelectorAll('[data-range]').forEach(b => { const selected = b.dataset.range === RANGE.key; b.classList.toggle('on', selected); b.setAttribute('aria-pressed', String(selected)); });
+  $('#filters').classList.toggle('custom', RANGE.key === 'custom');
   $('#from').value = RANGE.key === 'custom' ? RANGE.from : ''; $('#to').value = RANGE.key === 'custom' ? RANGE.to : '';
 }
 if (SINCE) { const b = $('#since-btn'); b.hidden = false; b.textContent = 'Since ' + fmtDate(new Date(SINCE + 'T00:00').getTime()); b.title = 'From ' + SINCE; }
-$('#presets').onclick = e => { const b = e.target.closest('button'); if (b) setRange({key: b.dataset.r, from: '', to: ''}); };
+$('#presets').onclick = e => { const b = e.target.closest('[data-range]'); if (b) setRange({key: b.dataset.range, from: '', to: ''}); };
 const onCustom = () => { let from = $('#from').value, to = $('#to').value; if (!from && !to) return setRange({key: 'all', from: '', to: ''}); if (from && to && from > to) [from, to] = [to, from]; setRange({key: 'custom', from, to}); };
 $('#from').onchange = onCustom; $('#to').onchange = onCustom;
 const stat = (k, v, s = '', c = '') => `<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
@@ -494,8 +500,6 @@ function render() {
   const d = DATA, a = A, balances = accountBalances(d);
   const rb = rangeBounds();
   syncFilters();
-  const netInRange = a.realizedNet + a.fundNet;
-  $('#range-sum').innerHTML = `<b>${rb.label}</b> · ${a.count} closed trade${a.count === 1 ? '' : 's'} · <span class="${cls(netInRange)}">${fmtUsd(netInRange, {sign: true})}</span> realized after fees and funding`;
   const acct = balances.equity, total = balances.total;
   renderSummary(d, a, rb, acct, total);
 

@@ -88,7 +88,6 @@ function renderPortfolioChart() {
   const calendarView = CHART_VIEW === 'calendar';
   $('#chart-plot').hidden = calendarView; $('#chart-calendar').hidden = !calendarView;
   document.querySelectorAll('[data-metric]').forEach(b=>{b.disabled=calendarView;b.classList.toggle('on',b.dataset.metric===CHART_METRIC);b.setAttribute('aria-pressed',String(b.dataset.metric===CHART_METRIC));});
-  document.querySelectorAll('[data-range]').forEach(b=>{b.classList.toggle('on',b.dataset.range===RANGE.key);b.setAttribute('aria-pressed',String(b.dataset.range===RANGE.key));});
   const rb=rangeBounds();
   if (calendarView) {calendar($('#hero-calendar'),A.trades,Math.max(rb.from,DATA.fills[0]?.time ?? Date.now()),Math.min(rb.to,Date.now()));return;}
   $('#chart-plot').setAttribute('aria-labelledby','chart-tab-'+CHART_VIEW);
@@ -199,13 +198,11 @@ function initDashboard() {
   $('#share-dashboard').onclick=()=>copyText(location.href,'Dashboard link');
   if(/^0x[0-9a-fA-F]{40}$/.test(user))$('#explorer-link').href='https://app.hyperliquid.xyz/explorer/address/'+user;
   $('#performance-range').onchange=renderPerformanceCard;
-  $('#toggle-dates').onclick=()=>{const filters=$('#filters');filters.hidden=!filters.hidden;$('#toggle-dates').setAttribute('aria-expanded',String(!filters.hidden));};
   if(!SINCE)$('#performance-range option[value="since"]').remove();
   $('#table-tabs').onclick=e=>{const b=e.target.closest('[data-table]');if(b)selectTable(b.dataset.table);};
   $('#view-positions').onclick=()=>selectTable('positions');
   $('#chart-tabs').onclick=e=>{const b=e.target.closest('[data-chart]');if(!b)return;CHART_VIEW=b.dataset.chart;document.querySelectorAll('[data-chart]').forEach(t=>{const selected=t===b;t.setAttribute('aria-selected',String(selected));t.tabIndex=selected?0:-1;});renderPortfolioChart();};
   document.querySelectorAll('[data-metric]').forEach(b=>b.onclick=()=>{CHART_METRIC=b.dataset.metric;renderPortfolioChart();});
-  document.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>setRange({key:b.dataset.range,from:'',to:''}));
   document.querySelectorAll('[role="tablist"]').forEach(list=>list.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const tabs=[...list.querySelectorAll('[role="tab"]')],i=tabs.indexOf(document.activeElement);if(i<0)return;e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;tabs[next].click();tabs[next].focus();}));
   document.addEventListener('error',e=>{if(e.target instanceof HTMLImageElement&&e.target.closest('.coin-icon'))e.target.hidden=true;},true);
 }
