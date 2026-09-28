@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#141310">
 <title>Hyperliquid Stats</title>
-<link rel="stylesheet" href="dashboard.css?v=20260928-chart-first">
+<link rel="stylesheet" href="dashboard.css?v=20260928-timestamp">
 </head>
 <body>
 <div class="dashboard wrap">
@@ -65,7 +65,7 @@
   <aside class="panel activity-panel" aria-label="Recent activity"><div class="panel-head"><h2>Recent Activity</h2><span id="activity-status" class="activity-status">LOADING</span></div><div class="activity-feed" id="activity-feed"><div class="empty">Loading recent activity…</div></div><div class="activity-footer" id="activity-footer">Latest fills and transfers · local time</div></aside>
 </div>
 <div class="tip" id="tip" role="tooltip"></div><div class="toast" id="toast" role="status" hidden></div>
-<script src="dashboard.js?v=20260928-chart-first"></script>
+<script src="dashboard.js?v=20260928-timestamp"></script>
 
 <script>
 /* ---------- config ---------- */
@@ -102,7 +102,7 @@ const fmtDur = ms => {
 const fmtDate = t => new Date(t).toLocaleDateString('en-US', {month:'short', day:'numeric'});
 const fmtDateTime = t => new Date(t).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
 const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-const ago = t => { const s = (Date.now()-t)/1000; if (s<60) return 'just now'; if (s<3600) return Math.round(s/60)+'m ago'; if (s<86400) return Math.round(s/3600)+'h ago'; return Math.round(s/86400)+'d ago'; };
+const fmtUpdatedAt = t => new Date(t).toLocaleString('en-US', {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', second:'2-digit', timeZoneName:'short'});
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- data ---------- */
@@ -601,7 +601,7 @@ function renderPositions() { renderOpenPositions(); }
 function setStatus(kind, msg) { const s = $('#status'); if (!kind) { s.hidden = true; return; } s.hidden = false; s.className = 'status ' + kind; s.textContent = msg; }
 function apply(d, fromCache) {
   DATA = d; const rb = rangeBounds(); A = analyze(d, rb.from, rb.to);
-  $('#updated').textContent = (fromCache ? 'cached · ' : 'updated ') + ago(d.ts);
+  $('#updated').textContent = (fromCache ? 'Cached · ' : 'Updated · ') + fmtUpdatedAt(d.ts);
   render();
 }
 async function refresh() {
@@ -630,7 +630,7 @@ if (!user) askForWallet('Enter a Hyperliquid wallet address to view its stats.')
 else if (!/^0x[0-9a-fA-F]{40}$/.test(user)) askForWallet(`"${esc(user)}" is not a valid wallet address.`);
 else { try { localStorage.setItem('hl-user', user); } catch {} refresh(); }
 let rt, lastW = 0; new ResizeObserver(([e]) => { const w = e.contentRect.width; if (Math.abs(w - lastW) < 2) return; lastW = w; clearTimeout(rt); rt = setTimeout(() => DATA && render(), 120); }).observe($('.wrap'));
-setInterval(() => { if (DATA) { $('#updated').textContent = $('#updated').textContent.replace(/(cached · |updated ).*/, '$1' + ago(DATA.ts)); updateActivityStatus(); } }, 30000);
+setInterval(() => { if (DATA) updateActivityStatus(); }, 30000);
 setInterval(() => { if (/^0x[0-9a-fA-F]{40}$/.test(user) && !document.hidden) refresh(); }, 60000);
 </script>
 </body>

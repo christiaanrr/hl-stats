@@ -160,7 +160,7 @@ function renderActivity(d) {
 function updateActivityStatus() {
   const fresh=DATA&&Date.now()-DATA.ts<120000,el=$('#activity-status');
   el.textContent=DATA?(fresh?'UPDATED':'CACHED'):'LOADING';el.classList.toggle('fresh',Boolean(fresh));
-  $('#activity-footer').textContent=DATA?`Updated ${ago(DATA.ts)} · refreshes every minute · local time`:'Latest fills and transfers · local time';
+  $('#activity-footer').textContent=DATA?`Updated ${fmtUpdatedAt(DATA.ts)} · refreshes every minute`:'Latest fills and transfers · local time';
 }
 function selectTable(name) {
   TABLE_VIEW=name;
