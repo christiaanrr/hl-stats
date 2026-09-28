@@ -97,3 +97,17 @@ test('incomplete fills or activity newer than snapshots cannot produce unrealize
     assert.ok(tiles[2].includes('+$150.00'));
   }
 });
+
+test('combined chart uses combined history while perps metrics keep their own history',()=>{
+  const {c,d}=setup();
+  d.portfolio.allTime={pnlHistory:[[0,'1000'],[10,'1100'],[20,'1400']],accountValueHistory:[[0,'100'],[10,'1000'],[20,'1500']]};
+  assert.equal(c.periodPerformance(d,{from:0,to:20},'combined','pnl').total,400);
+  assert.equal(c.periodPerformance(d,{from:0,to:20}).total,200);
+});
+test('value chart preserves actual equity rather than subtracting a PnL baseline',()=>{
+  const {c,d}=setup();
+  d.portfolio.perpAllTime.accountValueHistory=[[0,'100'],[10,'1000'],[20,'1500']];
+  const p=c.periodPerformance(d,{from:5,to:15},'perps','value');
+  assert.equal(p.points[0].v,550);assert.equal(p.total,1250);assert.equal(p.points.at(-1).v,1250);
+  assert.equal(c.periodPerformance(d,{from:5,to:15},'combined','value').total,null);
+});

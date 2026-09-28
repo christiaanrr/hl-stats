@@ -4,224 +4,73 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#111518">
+<meta name="theme-color" content="#141310">
 <title>Hyperliquid Stats</title>
-<style>
-:root{
-  color-scheme:dark;
-  --page:#111518; --surface:#191e23; --surface-2:#22282e;
-  --ink:#d4d9df; --ink-2:#b1bac4; --muted:#939da8;
-  --grid:#2c343e; --axis:#485563; --border:#2c343e; --border-strong:#3b4551;
-  --good-rgb:71,163,130; --bad-rgb:200,108,117;
-  --good:rgb(var(--good-rgb)); --good-text:#7bc5a5; --bad:rgb(var(--bad-rgb)); --bad-text:#e2989f;
-  --accent:#84aad4; --wash:rgba(132,170,212,.12);
-  --selected:#30435a; --selected-text:#c3d7ee;
-  --radius:12px;
-}
-*{box-sizing:border-box}
-html,body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1180px;margin:0 auto;padding:20px 20px 48px}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
-h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em}
-.sub{color:var(--ink-2);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.addr{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--surface);border:1px solid var(--border);padding:3px 8px;border-radius:6px}
-.badge{font-size:11px;padding:2px 7px;border-radius:999px;background:var(--surface-2);color:var(--ink-2)}
-.card h2 .badge{margin-left:6px;font-weight:500}
-button{font:inherit;background:var(--surface);border:1px solid var(--border);color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer}
-button:hover{background:var(--surface-2)}
-button:focus-visible,input:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-button:disabled{opacity:.5;cursor:default}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;min-width:0}
-.card h2{font-size:13px;font-weight:600;color:var(--ink-2);margin:0 0 12px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.card h2 small{font-weight:400;color:var(--muted);font-size:12px}
-.grid{display:grid;gap:14px;margin-bottom:14px}
-.tiles{grid-template-columns:repeat(4,1fr)}
-@media (max-width:900px){.tiles{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:480px){.tiles{grid-template-columns:1fr}}
-.tile .label{font-size:12px;color:var(--ink-2)}
-.tile .label em{font-style:normal;color:var(--muted)}
-.tile .value{font-size:24px;font-weight:600;margin:4px 0 2px;letter-spacing:-.01em}
-.tile .delta{font-size:12px;color:var(--muted)}
-.two{grid-template-columns:1fr 1fr}
-.two-eq{grid-template-columns:1fr 1fr}
-@media (max-width:820px){.two,.two-eq{grid-template-columns:1fr}}
-.pos{color:var(--good-text)} .neg{color:var(--bad-text)}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 14px}
-@media (max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}}
-.stat .k{font-size:11px;color:var(--muted)}
-.stat .v{font-size:16px;font-weight:600;margin-top:1px}
-.stat .s{font-size:11px;color:var(--ink-2)}
-.legend{display:flex;gap:14px;font-size:12px;color:var(--ink-2);margin-bottom:6px;flex-wrap:wrap}
-.legend span::before{content:"";display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle;background:var(--c)}
-.chart{width:100%;position:relative}
-.chart svg{display:block;width:100%;overflow:visible}
-.chart text{font:11px system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--muted)}
-.months{display:grid;grid-template-columns:repeat(3,1fr);gap:18px 26px}
-@media (max-width:900px){.months{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:560px){.months{grid-template-columns:1fr}}
-.month h3{font-size:13px;font-weight:600;margin:0 0 6px;display:flex;justify-content:space-between;align-items:baseline}
-.month h3 span{font-weight:600;font-size:12px}
-.days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-.dow{font-size:10px;color:var(--muted);text-align:center;padding-bottom:2px}
-.day{aspect-ratio:1;border-radius:5px;background:var(--surface-2);position:relative;font-size:10px;color:var(--muted);padding:3px 4px;min-width:0;overflow:hidden}
-.day.has{color:var(--ink);cursor:default}
-.day .n{position:absolute;top:2px;left:4px;opacity:.75}
-.day .v{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-weight:600;font-size:11px;white-space:nowrap;letter-spacing:-.02em}
-.day.blank{background:transparent}
-.day.future{opacity:.35}
-.tbl{width:100%;overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
-th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--grid)}
-th{font-weight:500;color:var(--ink-2);font-size:12px;cursor:pointer;user-select:none;position:sticky;top:0;background:var(--surface)}
-th:hover{color:var(--ink)}
-th.on{color:var(--ink)}
-th:first-child,td:first-child,th.left,td.left{text-align:left}
-.more{text-align:center;padding-top:12px}
-tr:last-child td{border-bottom:0}
-td.coin{font-weight:600}
-.pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:500}
-.pill.long{background:rgba(var(--good-rgb),.14);color:var(--good-text)}
-.pill.short{background:rgba(var(--bad-rgb),.14);color:var(--bad-text)}
-.tip{position:fixed;pointer-events:none;background:var(--surface-2);color:var(--ink);border:1px solid var(--border-strong);box-shadow:0 6px 20px rgba(0,0,0,.3);font-size:12px;padding:6px 9px;border-radius:6px;opacity:0;transition:opacity .08s;z-index:10;white-space:nowrap;line-height:1.4}
-.tip b{font-weight:600}
-.status{padding:14px 18px;border-radius:var(--radius);margin-bottom:14px;font-size:13px}
-.status.err{background:rgba(var(--bad-rgb),.12);color:var(--bad-text);border:1px solid rgba(var(--bad-rgb),.3)}
-.status.load{background:var(--surface);color:var(--ink-2);border:1px solid var(--border)}
-.empty{color:var(--muted);font-size:13px;padding:12px 0}
-.filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-.seg{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:2px}
-.seg button{border:0;background:transparent;padding:5px 11px;border-radius:6px;font-size:13px;color:var(--ink-2)}
-.seg button:hover{background:var(--surface-2);color:var(--ink)}
-.seg button.on{background:var(--selected);color:var(--selected-text)}
-.seg button.since{color:var(--muted);font-size:12px;border-left:1px solid var(--grid);border-radius:0 6px 6px 0;margin-left:2px}
-.seg button.since.on{color:var(--selected-text)}
-.range{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2)}
-.range input{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 6px}
-.range-sum{margin-left:auto;font-size:13px;color:var(--ink-2)}
-@media (max-width:640px){.range-sum{margin-left:0;width:100%}}
-footer{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
-.skel{color:var(--muted)}
-.summary-heading{font-size:13px;font-weight:600;color:var(--ink-2);margin:18px 0 10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.summary-heading small{font-weight:400;color:var(--muted)}
-.account-overview{grid-template-columns:1.65fr 1fr;margin:0 0 18px}
-.account-overview .tile{padding:16px 18px}
-.account-overview .tile:first-child{border-color:var(--border-strong)}
-.account-overview .label{font-size:13px}
-.account-overview .value{font-size:24px;line-height:1.2;margin:6px 0 8px}
-.account-overview .tile:first-child .value{font-size:30px;letter-spacing:-.025em}
-.balance-breakdown{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
-.balance-breakdown span{display:block;font-size:11px;color:var(--muted)}
-.balance-breakdown strong{display:block;margin-top:3px;font-size:13px;font-weight:500;color:var(--ink-2)}
-.tile-ratio{display:block;margin-bottom:5px;color:var(--ink-2)}
-#tiles .value{margin:8px 0 10px}
-#tiles .delta{line-height:1.6}
-@media (max-width:640px){.account-overview{grid-template-columns:1fr;gap:10px}.account-overview .tile{padding:14px 16px}.account-overview .tile:first-child .value{font-size:28px}.account-overview .value{font-size:24px}.balance-breakdown{gap:8px}}
-.cashflow-stats{margin-bottom:12px}
-.cashflow-note{font-size:12px;color:var(--muted);margin:10px 0 0}
-.cashflow-details summary{cursor:pointer;color:var(--ink-2);font-size:12px;padding:10px 0}
-.cashflow-details th{cursor:default}
-.cashflow-details a{color:var(--accent);text-decoration:none}
-.cashflow-details a:hover{text-decoration:underline}
-@media (max-width:480px){.cashflow-stats{grid-template-columns:1fr}.cashflow-card h2{flex-wrap:wrap}}
-</style>
+<link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div>
-      <h1>Hyperliquid perps</h1>
-      <div class="sub"><span class="addr" id="addr"></span><span id="updated" class="badge">loading…</span></div>
+<div class="dashboard wrap">
+  <aside class="sidebar panel" aria-label="Account overview">
+    <div class="profile-block">
+      <div class="profile">
+        <div class="avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-7 16-7 16 0"/></svg></div>
+        <div class="identity"><h1 id="addr">Hyperliquid stats</h1><div class="sub"><span id="wallet-short"></span><button class="icon-button" id="copy-wallet" aria-label="Copy wallet address" title="Copy address"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 5V4H4v12h1"/></svg></button></div></div>
+        <button class="icon-button" id="share-dashboard" aria-label="Copy dashboard link" title="Copy dashboard link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m9 10 6-4m-6 8 6 4"/></svg></button>
+      </div>
+      <div class="profile-actions"><button id="refresh">↻ Refresh</button><a id="explorer-link" href="https://app.hyperliquid.xyz/explorer" target="_blank" rel="noopener noreferrer">↗ Explorer</a></div>
+      <div class="update-line"><span id="updated">loading…</span><a class="tiny-link" href="#analytics">All metrics ↓</a></div>
     </div>
-    <div><button id="refresh">Refresh</button></div>
-  </header>
+    <div id="margin-alert" class="margin-card"><span class="eyebrow">Margin utilization</span><div class="risk-value" id="side-margin">–</div><div class="meter"><span id="side-margin-bar" style="width:0"></span></div><a href="#positions-section" id="view-positions">View open positions</a></div>
+    <section class="summary-section" aria-label="Current account overview"><div class="account-overview" id="now-tiles"></div></section>
+    <section class="side-section"><h2>Overview <small>current account</small></h2><div id="sidebar-overview"></div></section>
+    <section class="side-section analysis-section"><h2>Analysis <small>all time</small></h2><div id="sidebar-analysis"></div></section>
+    <section class="side-section performance-section"><h2>Performance <small id="sidebar-period"></small></h2><div id="sidebar-performance"></div></section>
+  </aside>
 
-  <div id="status" class="status load">Loading account data…</div>
+  <main class="workspace">
+    <div id="status" class="status load" role="status">Loading account data…</div>
+    <section class="overview-grid" aria-label="Account performance and exposure">
+      <article class="panel metric-card"><div class="panel-head"><h2>Performance</h2><select id="performance-range" aria-label="Performance card period"><option value="all">All time</option><option value="30">30 days</option><option value="7">7 days</option><option value="since">Since Aug 26</option></select></div><div class="metric-body" id="performance-card"><div class="empty">Loading performance…</div></div></article>
+      <article class="panel metric-card"><div class="panel-head"><h2>Leverage</h2></div><div class="metric-body" id="leverage-card"><div class="empty">Loading exposure…</div></div></article>
+      <article class="panel metric-card"><div class="panel-head"><h2>Margin Usage</h2></div><div class="metric-body" id="margin-card"><div class="empty">Loading margin…</div></div></article>
+      <article class="panel metric-card"><div class="panel-head"><h2>Direction Bias</h2></div><div class="metric-body" id="direction-card"><div class="empty">Loading positions…</div></div></article>
+    </section>
 
-  <div class="filters" id="filters">
-    <div class="seg" id="presets">
-      <button data-r="7">7D</button><button data-r="30">30D</button><button data-r="90">90D</button><button data-r="ytd">YTD</button><button data-r="all">All time</button><button data-r="since" class="since" id="since-btn" hidden></button>
+    <section class="panel chart-panel" aria-label="Portfolio chart">
+      <div class="chart-toolbar">
+        <div class="tabs" id="chart-tabs" role="tablist" aria-label="Chart view"><button id="chart-tab-perps" role="tab" aria-selected="true" aria-controls="chart-plot" data-chart="perps">Perps</button><button id="chart-tab-combined" role="tab" aria-selected="false" aria-controls="chart-plot" data-chart="combined" tabindex="-1">Combined</button><button id="chart-tab-calendar" role="tab" aria-selected="false" aria-controls="chart-calendar" data-chart="calendar" tabindex="-1">Calendar</button></div>
+        <div class="chart-options"><button data-metric="pnl" class="on" aria-pressed="true">PnL</button><button data-metric="value" aria-pressed="false">Value</button><span class="divider"></span><button data-range="1">24H</button><button data-range="7">7D</button><button data-range="30">30D</button><button data-range="all">All</button><span class="divider"></span><button id="toggle-dates" aria-controls="filters" aria-expanded="false">Dates</button></div>
+      </div>
+      <div id="chart-plot" role="tabpanel" aria-labelledby="chart-tab-perps"><div class="chart-caption"><h2 id="chart-title">Perps PnL</h2><div class="chart-value" id="chart-value">–</div></div><div class="chart" id="acct"></div><div class="sr-only" id="chart-note">PnL excludes deposits and withdrawals.</div></div>
+      <div id="chart-calendar" class="chart-calendar" role="tabpanel" aria-labelledby="chart-tab-calendar" hidden><div id="hero-calendar"></div></div>
+      <div class="filters" id="filters" hidden><details open><summary>Date filters <span aria-hidden="true">⌄</span></summary><div class="date-tools"><div class="seg" id="presets"><button data-r="1">24H</button><button data-r="7">7D</button><button data-r="30">30D</button><button data-r="90">90D</button><button data-r="ytd">YTD</button><button data-r="all">All time</button><button data-r="since" class="since" id="since-btn" hidden></button></div><label class="range">From <input type="date" id="from"></label><label class="range">To <input type="date" id="to"></label></div></details><div class="range-sum" id="range-sum"></div></div>
+    </section>
+
+    <section class="panel positions-panel" id="positions-section" aria-label="Account tables">
+      <div class="tabs table-tabs" id="table-tabs" role="tablist" aria-label="Account details"><button id="tab-positions" role="tab" aria-selected="true" aria-controls="panel-positions" data-table="positions">Positions <span class="count" id="position-count">0</span></button><button id="tab-balances" role="tab" aria-selected="false" aria-controls="panel-balances" data-table="balances" tabindex="-1">Balances</button><button id="tab-orders" role="tab" aria-selected="false" aria-controls="panel-orders" data-table="orders" tabindex="-1">Orders <span class="count" id="order-count">–</span></button><button id="tab-fills" role="tab" aria-selected="false" aria-controls="panel-fills" data-table="fills" tabindex="-1">Fills</button><button id="tab-trades" role="tab" aria-selected="false" aria-controls="panel-trades" data-table="trades" tabindex="-1">Trades</button><button id="tab-transfers" role="tab" aria-selected="false" aria-controls="panel-transfers" data-table="transfers" tabindex="-1">Transfers</button><button id="tab-performance" role="tab" aria-selected="false" aria-controls="panel-performance" data-table="performance" tabindex="-1">Performance</button></div>
+      <div id="panel-positions" role="tabpanel" aria-labelledby="tab-positions"><div class="table-caption"><span>Open positions · current snapshot</span><span id="pos-sub"></span></div><div class="table-panel"><div class="tbl" id="positions"></div></div></div>
+      <div id="panel-balances" role="tabpanel" aria-labelledby="tab-balances" hidden><div class="table-caption">Current account equity</div><div class="table-panel" id="balances"></div></div>
+      <div id="panel-orders" role="tabpanel" aria-labelledby="tab-orders" hidden><div class="table-caption">Open orders · current snapshot</div><div class="table-panel tbl" id="orders"></div></div>
+      <div id="panel-fills" role="tabpanel" aria-labelledby="tab-fills" hidden><div class="table-caption">Fills · selected date range</div><div class="table-panel tbl" id="fills-table"></div></div>
+      <div id="panel-trades" role="tabpanel" aria-labelledby="tab-trades" hidden><div class="table-caption"><span>Trade log</span><span id="log-sub">Closed trades, newest first</span></div><div class="table-panel tbl" id="tradelog"></div></div>
+      <div id="panel-transfers" role="tabpanel" aria-labelledby="tab-transfers" hidden><div class="table-caption">Deposits &amp; withdrawals · selected date range</div><div class="table-panel" id="transfer-table"></div></div>
+      <div id="panel-performance" role="tabpanel" aria-labelledby="tab-performance" hidden><div class="table-caption">Per-coin breakdown · selected date range · click a column to sort</div><div class="table-panel tbl" id="cointable"></div></div>
+    </section>
+
+    <div class="analytics" id="analytics">
+      <section class="summary-section" aria-labelledby="period-heading"><h2 class="summary-heading" id="period-heading">Selected-period perps performance <small id="period-label"></small></h2><div class="grid tiles" id="tiles"></div></section>
+      <section class="card cashflow-card"><h2>Deposits &amp; withdrawals <small id="cashflow-sub">in selected range</small></h2><div id="cashflow"><div class="empty">Loading deposit and withdrawal history…</div></div></section>
+      <section class="card"><h2><span>PnL calendar <span id="cal-month" class="badge"></span></span><small id="cal-sub">Closed trades per day, net of fees</small></h2><div id="calendar"></div></section>
+      <section class="grid two"><div class="card"><h2>Trade quality <small id="tq-sub"></small></h2><div class="stats" id="quality"></div></div><div class="card"><h2>PnL by coin <small>Top 5 winners and losers, net of fees</small></h2><div class="chart" id="bycoin"></div></div></section>
+      <section class="grid two"><div class="card"><h2>Distribution of trade outcomes <small>Net PnL per closed trade</small></h2><div class="chart" id="hist"></div></div><div class="card"><h2>Costs &amp; activity <small>In selected range</small></h2><div class="stats" id="fees"></div></div></section>
     </div>
-    <label class="range">From <input type="date" id="from"></label>
-    <label class="range">To <input type="date" id="to"></label>
-    <div class="range-sum" id="range-sum"></div>
-  </div>
+    <footer>Data from the public Hyperliquid API. Closed-trade stats group fills into round trips per coin (open to flat) and are computed only from fills, fees and funding, so deposits and withdrawals never affect them. Selected-period total PnL comes from Hyperliquid's portfolio history, net of transfers. The account overview always shows current balances. <span id="period-note"></span></footer>
+  </main>
 
-  <section class="summary-section" aria-label="Current account overview">
-    <div class="grid account-overview" id="now-tiles"></div>
-  </section>
-
-  <section class="summary-section" aria-labelledby="period-heading">
-    <h2 class="summary-heading" id="period-heading">Selected period <small id="period-label"></small></h2>
-    <div class="grid tiles" id="tiles"></div>
-  </section>
-
-  <section class="grid">
-    <div class="card">
-      <h2>Total PnL · selected period <small>excludes deposits and withdrawals</small></h2>
-      <div class="chart" id="acct"></div>
-    </div>
-  </section>
-
-  <section class="grid">
-    <div class="card cashflow-card">
-      <h2>Deposits &amp; withdrawals <small id="cashflow-sub">in selected range</small></h2>
-      <div id="cashflow"><div class="empty">Loading deposit and withdrawal history…</div></div>
-    </div>
-  </section>
-
-  <section class="grid">
-    <div class="card">
-      <h2><span>PnL calendar <span id="cal-month" class="badge"></span></span><small id="cal-sub">closed trades per day, net of fees</small></h2>
-      <div id="calendar"></div>
-    </div>
-  </section>
-
-  <section class="grid two">
-    <div class="card">
-      <h2>Trade quality <small id="tq-sub"></small></h2>
-      <div class="stats" id="quality"></div>
-    </div>
-    <div class="card">
-      <h2>PnL by coin <small>top 5 winners and losers, net of fees</small></h2>
-      <div class="chart" id="bycoin"></div>
-    </div>
-  </section>
-
-  <section class="grid two">
-    <div class="card">
-      <h2>Distribution of trade outcomes <small>net PnL per closed trade</small></h2>
-      <div class="chart" id="hist"></div>
-    </div>
-    <div class="card">
-      <h2>Costs &amp; activity <small>in selected range</small></h2>
-      <div class="stats" id="fees"></div>
-    </div>
-  </section>
-
-  <section class="grid">
-    <div class="card">
-      <h2>Per-coin breakdown <small>click a column to sort</small></h2>
-      <div class="tbl" id="cointable"></div>
-    </div>
-  </section>
-
-  <section class="grid">
-    <div class="card">
-      <h2>Trade log <small id="log-sub">closed trades in range, newest first</small></h2>
-      <div class="tbl" id="tradelog"></div>
-    </div>
-  </section>
-
-  <section class="grid">
-    <div class="card">
-      <h2>Open positions <small id="pos-sub"></small></h2>
-      <div class="tbl" id="positions"></div>
-    </div>
-  </section>
-
-  <footer>Data from the public Hyperliquid API. Closed-trade stats group fills into round trips per coin (open to flat) and are computed only from fills, fees and funding, so deposits and withdrawals never affect them. Selected-period total PnL comes from Hyperliquid's portfolio history, net of transfers. The account overview always shows current balances. <span id="period-note"></span></footer>
+  <aside class="panel activity-panel" aria-label="Recent activity"><div class="panel-head"><h2>Recent Activity</h2><span id="activity-status" class="activity-status">LOADING</span></div><div class="activity-feed" id="activity-feed"><div class="empty">Loading recent activity…</div></div><div class="activity-footer" id="activity-footer">Latest fills and transfers · local time</div></aside>
 </div>
-<div class="tip" id="tip"></div>
+<div class="tip" id="tip" role="tooltip"></div><div class="toast" id="toast" role="status" hidden></div>
+<script src="dashboard.js"></script>
 
 <script>
 /* ---------- config ---------- */
@@ -300,14 +149,15 @@ async function loadLedger() {
   throw new Error('Ledger history exceeds pagination limit');
 }
 async function loadAll() {
-  const [state, portfolio, fills, funding, ledger] = await Promise.all([
+  const [state, portfolio, fills, funding, ledger, orders] = await Promise.all([
     info({type:'clearinghouseState', user}),
     info({type:'portfolio', user}),
     paged('userFillsByTime', 2000, f => f.tid),
     paged('userFunding', 500, f => f.time + ':' + f.delta.coin),
     loadLedger().catch(() => null), // A ledger outage must not hide the trading dashboard.
+    info({type:'frontendOpenOrders', user}).catch(() => null),
   ]);
-  return {ts: Date.now(), state, portfolio: Object.fromEntries(portfolio), fills, funding, ledger};
+  return {ts: Date.now(), state, portfolio: Object.fromEntries(portfolio), fills, funding, ledger, orders};
 }
 
 /* ---------- analytics ---------- */
@@ -432,63 +282,6 @@ function frame(container, height, pad) {
   const svg = S('svg', {width: W, height: H, viewBox: `0 0 ${W} ${H}`}, container);
   return {svg, W, H, x0: pad.l, x1: W - pad.r, y0: pad.t, y1: H - pad.b};
 }
-function yAxis(f, ticks, scale) {
-  for (const v of ticks) {
-    const y = scale(v);
-    S('line', {x1: f.x0, x2: f.x1, y1: y, y2: y, stroke: v === 0 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1}, f.svg);
-    const t = S('text', {x: f.x0 - 8, y: y + 4, 'text-anchor': 'end'}, f.svg); t.textContent = tickLabel(v);
-  }
-}
-
-function lineChart(container, series, tEnd = Date.now(), tStart = Infinity) {
-  const all = series.flatMap(s => s.points);
-  if (!all.length) { container.innerHTML = '<div class="empty">No history yet.</div>'; return; }
-  const f = frame(container, 260, {l: 56, r: 68, t: 12, b: 26});   // right pad leaves room for the end-value label
-  const tMin = Math.min(...all.map(p => p.t), isFinite(tStart) ? tStart : Infinity), tMax = Math.max(...all.map(p => p.t), Math.min(tEnd, Date.now()));
-  let vMin = Math.min(0, ...all.map(p => p.v)), vMax = Math.max(0, ...all.map(p => p.v));
-  const ticks = niceTicks(vMin, vMax, 5); vMin = Math.min(vMin, ticks[0]); vMax = Math.max(vMax, ticks[ticks.length - 1]);
-  const X = t => f.x0 + (t - tMin) / (tMax - tMin || 1) * (f.x1 - f.x0);
-  const Y = v => f.y1 - (v - vMin) / (vMax - vMin || 1) * (f.y1 - f.y0);
-  yAxis(f, ticks, Y);
-  // x labels: ~6 dates
-  const nLab = Math.min(6, Math.floor((f.x1 - f.x0) / 90));
-  for (let i = 0; i <= nLab; i++) { const t = tMin + (tMax - tMin) * i / nLab; const el = S('text', {x: X(t), y: f.H - 8, 'text-anchor': i === 0 ? 'start' : i === nLab ? 'end' : 'middle'}, f.svg); el.textContent = fmtDate(t); }
-  for (const s of series) {
-    if (!s.points.length) continue;
-    let d = ''; s.points.forEach((p, i) => { const x = X(p.t), y = Y(p.v); d += (i ? (s.step ? `H${x.toFixed(1)}V${y.toFixed(1)}` : `L${x.toFixed(1)},${y.toFixed(1)}`) : `M${x.toFixed(1)},${y.toFixed(1)}`); });
-    // extend to now
-    const last = s.points[s.points.length - 1]; d += `H${X(tMax).toFixed(1)}`;
-    if (s.fill) S('path', {d: d + `V${Y(0)}H${X(s.points[0].t)}Z`, fill: s.color, opacity: .1}, f.svg);
-    S('path', {d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, f.svg);
-    S('circle', {cx: X(tMax), cy: Y(last.v), r: 4, fill: s.color, stroke: 'var(--surface)', 'stroke-width': 2}, f.svg);
-    const endLabel = S('text', {x: X(tMax) + 9, y: Y(last.v) + 4, style: 'fill:var(--ink);font-weight:600'}, f.svg);
-    endLabel.textContent = fmtUsd(last.v, {sign: true, dec: 0});
-  }
-  // hover crosshair
-  const cross = S('line', {y1: f.y0, y2: f.y1, stroke: 'var(--axis)', 'stroke-width': 1, opacity: 0}, f.svg);
-  const dots = series.map(s => S('circle', {r: 5, fill: s.color, stroke: 'var(--surface)', 'stroke-width': 2, opacity: 0}, f.svg));
-  // The hover target is the whole card so the first and last values are reachable; the cursor is clamped to the plot.
-  const hit = S('rect', {x: 0, y: 0, width: f.W, height: f.H, fill: 'transparent'}, f.svg);
-  const valueAt = (pts, t, step) => {
-    if (t < pts[0].t) return null;
-    let lo = 0, hi = pts.length - 1;
-    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (pts[m].t <= t) lo = m; else hi = m - 1; }
-    const a = pts[lo], b = pts[lo + 1];
-    if (step || !b || b.t === a.t) return a.v;                       // stepped series holds its value until the next point
-    return a.v + (b.v - a.v) * (t - a.t) / (b.t - a.t);              // smooth series is read off the drawn line
-  };
-  hit.addEventListener('mousemove', e => {
-    const r = f.svg.getBoundingClientRect();
-    const x = Math.max(f.x0, Math.min(f.x1, (e.clientX - r.left) * (f.W / r.width)));
-    const t = tMin + (x - f.x0) / (f.x1 - f.x0) * (tMax - tMin);
-    cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', 1);
-    let html = `<b>${fmtDateTime(t)}</b>`;
-    series.forEach((s, i) => { const v = valueAt(s.points, t, s.step); if (v == null) { dots[i].setAttribute('opacity', 0); return; } dots[i].setAttribute('cx', x); dots[i].setAttribute('cy', Y(v)); dots[i].setAttribute('opacity', 1); html += `<br>${s.name}: ${fmtUsd(v)}`; });
-    showTip(html, e);
-  });
-  hit.addEventListener('mouseleave', () => { cross.setAttribute('opacity', 0); dots.forEach(d => d.setAttribute('opacity', 0)); hideTip(); });
-}
-
 const cellVal = v => (v < 0 ? '−' : '+') + (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(1) + 'K' : Math.round(Math.abs(v)));
 function calendar(container, trades, from, to) {
   // A day's PnL is the net of trades that CLOSED that day (journal convention), so opening a position never colours a day.
@@ -571,11 +364,12 @@ function histogram(container, values) {
 
 /* ---------- render ---------- */
 let DATA = null, A = null, sortKey = 'net', sortDir = -1, LOG_ALL = false, CASHFLOW_ALL = false;
-let RANGE = {key: 'all', from: '', to: ''};
+let RANGE = {key: '7', from: '', to: ''};
 try { const r = JSON.parse(localStorage.getItem('hl-range')); if (r && r.key) RANGE = r; } catch {}
 const startOfDay = d => { d = new Date(d); d.setHours(0, 0, 0, 0); return d.getTime(); };
 function rangeBounds() {
   const now = Date.now(), today = startOfDay(now);
+  if (RANGE.key === '1') return {from:now-864e5,to:Infinity,label:'Last 24 hours'};
   if (RANGE.key === 'all') return {from: -Infinity, to: Infinity, label: 'All time'};
   if (RANGE.key === 'ytd') return {from: new Date(new Date().getFullYear(), 0, 1).getTime(), to: Infinity, label: 'Year to date'};
   if (RANGE.key === 'since' && SINCE) { const from = new Date(SINCE + 'T00:00').getTime(); return {from, to: Infinity, label: `Since ${fmtDate(from)}`}; }
@@ -600,20 +394,23 @@ const tile = (label, v, delta = '', c = '') => `<div class="card tile"><div clas
 
 // Each portfolio window has its own zero baseline. Never combine raw values from
 // different windows. Pick the shortest window that covers BOTH date boundaries.
-function periodPerformance(d, bounds) {
+function periodPerformance(d, bounds, scope = 'perps', metric = 'pnl') {
   const unavailable = reason => ({total:null, points:[], reason});
-  const histories = ['perpDay', 'perpWeek', 'perpMonth', 'perpAllTime'].map(key => ({key,
-    points:(d.portfolio[key]?.pnlHistory || []).map(([t,v]) => ({t:Number(t), v:Number(v)}))
+  const subject = metric === 'value' ? 'account value' : 'PnL';
+  const keys = scope === 'combined' ? ['day', 'week', 'month', 'allTime'] : ['perpDay', 'perpWeek', 'perpMonth', 'perpAllTime'];
+  const historyField = metric === 'value' ? 'accountValueHistory' : 'pnlHistory';
+  const histories = keys.map(key => ({key,
+    points:(d.portfolio[key]?.[historyField] || []).map(([t,v]) => ({t:Number(t), v:Number(v)}))
       .filter(p => Number.isFinite(p.t) && Number.isFinite(p.v)).sort((a,b) => a.t-b.t)
   })).filter(h => h.points.length >= 2);
-  if (!histories.length) return unavailable('Historical PnL is unavailable for this period.');
+  if (!histories.length) return unavailable(`Historical ${subject} is unavailable for this period.`);
   const latest = Math.max(...histories.map(h => h.points.at(-1).t));
   const to = Math.min(bounds.to, latest);
-  if (bounds.from > to) return unavailable('No historical PnL is available in this date range.');
-  const history = histories.find(h => (bounds.from === -Infinity ? h.key === 'perpAllTime' : h.points[0].t <= bounds.from) && h.points.at(-1).t >= to);
-  if (!history) return unavailable('Historical PnL does not cover the start of this period.');
+  if (bounds.from > to) return unavailable(`No historical ${subject} is available in this date range.`);
+  const history = histories.find(h => (bounds.from === -Infinity ? h.key === keys[3] : h.points[0].t <= bounds.from) && h.points.at(-1).t >= to);
+  if (!history) return unavailable(`Historical ${subject} does not cover the start of this period.`);
   const from = bounds.from === -Infinity ? history.points[0].t : bounds.from;
-  if (to < from) return unavailable('No historical PnL is available in this date range.');
+  if (to < from) return unavailable(`No historical ${subject} is available in this date range.`);
   let interpolated = false;
   const valueAt = time => {
     const i = history.points.findIndex(p => p.t >= time), b = history.points[i];
@@ -622,8 +419,8 @@ function periodPerformance(d, bounds) {
     interpolated = true;
     return a.v + (b.v-a.v) * (time-a.t)/(b.t-a.t);
   };
-  const base = valueAt(from), total = valueAt(to)-base;
-  const points = [{t:from,v:0}, ...history.points.filter(p => p.t > from && p.t < to).map(p => ({t:p.t,v:p.v-base})), {t:to,v:total}];
+  const base = metric === 'value' ? 0 : valueAt(from), total = valueAt(to)-base;
+  const points = [{t:from,v:valueAt(from)-base}, ...history.points.filter(p => p.t > from && p.t < to).map(p => ({t:p.t,v:p.v-base})), {t:to,v:total}];
   return {total, points, from, to, interpolated, reason:''};
 }
 
@@ -672,10 +469,8 @@ function render() {
   const total = n(p.allTime?.accountValueHistory?.at(-1)?.[1]) || acct;  // perp + spot, Hyperliquid's own total
   renderSummary(d, a, rb, acct, total);
 
-  // The chart and total-PnL tile share the same history and boundary values.
-  const performance = periodPerformance(d, rb);
-  if (performance.total == null) $('#acct').innerHTML = `<div class="empty">${esc(performance.reason)}</div>`;
-  else lineChart($('#acct'), [{name:'Total PnL', color:'var(--accent)', points:performance.points, fill:true}], performance.to, performance.from);
+  // Chart tabs share the same date boundaries as the preserved analytics.
+  renderDashboard(d, a, rb, acct, total);
   const firstFill = d.fills[0]?.time ?? Date.now();
   const dFrom = Math.max(rb.from, firstFill), dTo = Math.min(rb.to, Date.now());
   const dayNet = {}; for (const t of a.trades) { const k = dayKey(t.close); dayNet[k] = (dayNet[k] || 0) + t.net; }
@@ -776,19 +571,7 @@ function renderTradeLog() {
   const b = $('#log-more'); if (b) b.onclick = () => { LOG_ALL = !LOG_ALL; renderTradeLog(); };
 }
 
-function renderPositions() {
-  const ps = DATA.state.assetPositions.map(p => p.position).sort((a, b) => n(b.positionValue) - n(a.positionValue));
-  const totalNtl = ps.reduce((s, p) => s + n(p.positionValue), 0);
-  $('#pos-sub').textContent = ps.length ? `${fmtUsd(totalNtl, {dec: 0})} notional` : '';
-  if (!ps.length) { $('#positions').innerHTML = '<div class="empty">No open positions.</div>'; return; }
-  const rows = ps.map(p => { const sz = n(p.szi), long = sz > 0, upnl = n(p.unrealizedPnl), mark = Math.abs(sz) ? n(p.positionValue) / Math.abs(sz) : 0; return `<tr>
-    <td class="coin">${esc(p.coin)} <span class="pill ${long ? 'long' : 'short'}">${long ? 'Long' : 'Short'}</span></td>
-    <td>${fmtNum(Math.abs(sz), 4)}</td><td>${fmtUsd(n(p.positionValue), {dec: 0})}</td><td>${fmtNum(n(p.entryPx), 5)}</td><td>${fmtNum(mark, 5)}</td>
-    <td>${p.leverage?.value ?? '–'}× <span class="badge">${p.leverage?.type ?? ''}</span></td>
-    <td class="${cls(upnl)}"><b>${fmtUsd(upnl, {sign: true})}</b></td><td class="${cls(upnl)}">${fmtPct(n(p.returnOnEquity))}</td>
-    <td>${p.liquidationPx ? fmtNum(n(p.liquidationPx), 5) : '–'}</td><td class="${cls(-n(p.cumFunding?.sinceOpen))}">${fmtUsd(-n(p.cumFunding?.sinceOpen), {sign: true})}</td></tr>`; }).join('');
-  $('#positions').innerHTML = `<table><thead><tr><th style="cursor:default">Coin</th><th style="cursor:default">Size</th><th style="cursor:default">Value</th><th style="cursor:default">Entry</th><th style="cursor:default">Mark</th><th style="cursor:default">Leverage</th><th style="cursor:default">Unrealized</th><th style="cursor:default">ROE</th><th style="cursor:default">Liq. price</th><th style="cursor:default">Funding</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
+function renderPositions() { renderOpenPositions(); }
 
 /* ---------- boot ---------- */
 function setStatus(kind, msg) { const s = $('#status'); if (!kind) { s.hidden = true; return; } s.hidden = false; s.className = 'status ' + kind; s.textContent = msg; }
@@ -798,31 +581,33 @@ function apply(d, fromCache) {
   render();
 }
 async function refresh() {
-  const btn = $('#refresh'); btn.disabled = true; btn.textContent = 'Refreshing…';
+  const btn = $('#refresh'); if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Refreshing…';
   try {
     const d = await loadAll();
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch {}
     apply(d, false); setStatus(null);
   } catch (e) {
     setStatus('err', `Could not reach the Hyperliquid API (${e.message}). ${DATA ? 'Showing the last cached data.' : 'Check your connection and try again.'}`);
-  } finally { btn.disabled = false; btn.textContent = 'Refresh'; }
+  } finally { btn.disabled = false; btn.textContent = '↻ Refresh'; updateActivityStatus(); }
 }
 $('#addr').textContent = user ? user.slice(0, 6) + '…' + user.slice(-4) : 'no wallet';
 $('#addr').title = user;
 $('#refresh').onclick = refresh;
+initDashboard();
 if (user) try { const c = JSON.parse(localStorage.getItem(CACHE_KEY)); if (c && c.fills) { apply(c, true); setStatus('load', 'Showing cached data, refreshing…'); } } catch {}
 function askForWallet(msg) {
-  $('.filters').hidden = true; $('#tiles').innerHTML = ''; $('#refresh').hidden = true;
+  $('#refresh').hidden = true;
   const s = $('#status'); s.hidden = false; s.className = 'status load';
-  s.innerHTML = `<form id="wallet-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span>${msg}</span><input id="wallet" placeholder="0x…" style="font:inherit;font-family:ui-monospace,Menlo,monospace;flex:1;min-width:260px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)"><button type="submit">Open</button></form>`;
-  document.querySelectorAll('section.grid, .summary-section, footer').forEach(el => el.hidden = true);
-  $('#wallet-form').onsubmit = e => { e.preventDefault(); const v = $('#wallet').value.trim(); if (/^0x[0-9a-fA-F]{40}$/.test(v)) location.search = '?user=' + v; else $('#wallet').style.borderColor = 'var(--bad)'; };
+  s.innerHTML = `<form id="wallet-form" class="wallet-form"><label for="wallet">${msg}</label><input id="wallet" placeholder="0x…" autocomplete="off" spellcheck="false"><button type="submit">Open dashboard</button></form>`;
+  document.querySelectorAll('.overview-grid, .chart-panel, .positions-panel, .analytics, .activity-panel, .summary-section, .side-section, .margin-card, footer').forEach(el => el.hidden = true);
+  $('#wallet-form').onsubmit = e => { e.preventDefault(); const v = $('#wallet').value.trim(); if (/^0x[0-9a-fA-F]{40}$/.test(v)) location.search = '?user=' + v; else { $('#wallet').style.borderColor = 'var(--bad)'; $('#wallet').setAttribute('aria-invalid','true'); } };
 }
 if (!user) askForWallet('Enter a Hyperliquid wallet address to view its stats.');
 else if (!/^0x[0-9a-fA-F]{40}$/.test(user)) askForWallet(`"${esc(user)}" is not a valid wallet address.`);
 else { try { localStorage.setItem('hl-user', user); } catch {} refresh(); }
 let rt, lastW = 0; new ResizeObserver(([e]) => { const w = e.contentRect.width; if (Math.abs(w - lastW) < 2) return; lastW = w; clearTimeout(rt); rt = setTimeout(() => DATA && render(), 120); }).observe($('.wrap'));
-setInterval(() => { if (DATA) $('#updated').textContent = $('#updated').textContent.replace(/(cached · |updated ).*/, '$1' + ago(DATA.ts)); }, 30000);
+setInterval(() => { if (DATA) { $('#updated').textContent = $('#updated').textContent.replace(/(cached · |updated ).*/, '$1' + ago(DATA.ts)); updateActivityStatus(); } }, 30000);
+setInterval(() => { if (/^0x[0-9a-fA-F]{40}$/.test(user) && !document.hidden) refresh(); }, 60000);
 </script>
 </body>
 </html>
