@@ -2,7 +2,6 @@
 let CHART_VIEW = 'perps', CHART_METRIC = 'pnl', TABLE_VIEW = 'positions';
 let POSITION_SORT = {key:'value', direction:-1}, SHOW_ALL_FILLS = false, ACTIVITY_LIMIT = 60;
 let toastTimer;
-const clampPercent = value => Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
 
 function accountExposure(d) {
   const state = d.state, balances = accountBalances(d);
@@ -53,28 +52,15 @@ function renderDashboard(d, acct, total) {
   const lev = ex.leverage == null ? 'N/A' : ex.leverage.toFixed(2)+'×';
   const margin = ex.usage == null ? 'N/A' : fmtPct(ex.usage,2);
   const equityLabel = balances.unified ? 'Unified USDC' : 'Perps equity';
-  const leverageNote = `Open Hyperliquid perps notional / ${equityLabel.toLowerCase()}. Bar scale: 0–5×.`;
-  $('#leverage-card').innerHTML = `<div class="metric-value warn">${lev}</div><div class="meter gold" title="${leverageNote}"><span style="width:${clampPercent(ex.leverage/5*100)}%"></span></div><div class="metric-caption"><span class="warn">${fmtUsd(ex.notional,{compact:true,dec:0})} Notional</span> · ${fmtUsd(acct,{compact:true,dec:0})} ${equityLabel}</div>`;
-  $('#margin-card').innerHTML = `<div class="metric-value ${ex.usage == null ? '' : ex.usage >= .8 ? 'neg' : 'pos'}">${margin}</div><div class="meter" title="${balances.usedLabel} / ${equityLabel.toLowerCase()}. ${balances.usedNote}"><span style="width:${clampPercent(ex.usage*100)}%;background:var(--${ex.usage >= .8 ? 'bad' : 'good'})"></span></div><div class="metric-caption"><span class="${ex.usage == null ? '' : ex.usage >= .8 ? 'neg' : 'pos'}">${fmtUsd(ex.free)} Free</span> · ${fmtUsd(ex.used,{compact:true,dec:0})} ${balances.unified ? 'held' : 'in use'}</div>`;
-  const ls = ex.longShare, ss = ls == null ? null : 1-ls;
-  const bias = ls == null ? 'No open exposure' : ls === 1 ? 'Long only ↗' : ls === 0 ? 'Short only ↘' : ls > .6 ? 'Long biased ↗' : ls < .4 ? 'Short biased ↘' : 'Balanced ⇄';
-  $('#direction-card').innerHTML = `<div class="metric-value ${ls == null ? '' : ls >= .5 ? 'pos' : 'neg'}" title="Direction of open positions, weighted by notional value">${bias}</div><div class="meter direction"><span style="width:${clampPercent(ls*100)}%"></span><span style="width:${clampPercent(ss*100)}%"></span></div><div class="metric-caption split"><span><span class="pos">${ls == null ? '–' : fmtPct(ls,0)}</span> · Long ${fmtUsd(ex.long,{compact:true,dec:0})}</span><span>${fmtUsd(ex.short,{compact:true,dec:0})} Short · <span class="neg">${ss == null ? '–' : fmtPct(ss,0)}</span></span></div>`;
+  const leverageNote = `Open Hyperliquid perps notional / ${equityLabel.toLowerCase()}.`;
   $('#sidebar-overview').innerHTML = [
     sideRow('Account leverage',lev,'',leverageNote),sideRow('Margin usage',margin,ex.usage >= .8 ? 'neg' : '',balances.usedNote),
     sideRow('All-time PnL',fmtUsd(lifetime.total,{sign:true,compact:true}),cls(lifetime.total),'Perps PnL from portfolio history, net of transfers'),
     sideRow('Volume',fmtUsd(all.totalVol)),sideRow('Open notional',fmtUsd(ex.notional,{compact:true,dec:0})),
   ].join('');
-  renderPerformanceCard();
   renderPortfolioChart();
   renderAccountTables(d,acct,total);
   renderActivity(d);
-}
-function renderPerformanceCard() {
-  if (!DATA) return;
-  const key = $('#performance-range').value, bounds = key === 'all' ? {from:-Infinity,to:Infinity} : key === 'since' ? {from:new Date(SINCE+'T00:00').getTime(),to:Infinity} : {from:startOfDay(Date.now())-(Number(key)-1)*864e5,to:Infinity};
-  const a = analyze(DATA,bounds.from,bounds.to), p = periodPerformance(DATA,bounds), recent = a.trades.slice(-40);
-  const ticks = recent.map(t=>`<span class="trade-tick ${t.net > 0 ? 'win' : ''}" title="${esc(t.coin)} · ${esc(fmtDateTime(t.close))} · ${esc(fmtUsd(t.net,{sign:true}))}"></span>`).join('');
-  $('#performance-card').innerHTML = `<div class="metric-value ${cls(p.total)}">${fmtUsd(p.total,{sign:true})} <small>PnL</small></div><div class="trade-strip" role="img" aria-label="Last ${recent.length} closed trades: ${recent.filter(t=>t.net>0).length} wins, ${recent.filter(t=>t.net<=0).length} losses">${ticks}</div><div class="metric-caption"><span class="pos">${a.winRate == null ? '–' : fmtPct(a.winRate)} Win Rate</span> · ${a.count} Trades</div>`;
 }
 function renderPortfolioChart() {
   if (!DATA) return;
@@ -190,8 +176,6 @@ function initDashboard() {
   $('#copy-wallet').onclick=()=>copyText(user,'Address');$('#copy-wallet').disabled=!user;
   $('#share-dashboard').onclick=()=>copyText(location.href,'Dashboard link');
   if(/^0x[0-9a-fA-F]{40}$/.test(user))$('#explorer-link').href='https://app.hyperliquid.xyz/explorer/address/'+user;
-  $('#performance-range').onchange=renderPerformanceCard;
-  if(!SINCE)$('#performance-range option[value="since"]').remove();
   $('#table-tabs').onclick=e=>{const b=e.target.closest('[data-table]');if(b)selectTable(b.dataset.table);};
   $('#chart-tabs').onclick=e=>{const b=e.target.closest('[data-chart]');if(!b)return;CHART_VIEW=b.dataset.chart;document.querySelectorAll('[data-chart]').forEach(t=>{const selected=t===b;t.setAttribute('aria-selected',String(selected));t.tabIndex=selected?0:-1;});renderPortfolioChart();};
   document.querySelectorAll('[data-metric]').forEach(b=>b.onclick=()=>{CHART_METRIC=b.dataset.metric;renderPortfolioChart();});
