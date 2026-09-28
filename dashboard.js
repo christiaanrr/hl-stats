@@ -48,7 +48,7 @@ function coinIcon(coin) {
 function sideRow(key, value, color = '', title = '') {
   return `<div class="side-row"${title ? ` title="${esc(title)}"` : ''}><span class="key">${key}</span><span class="val ${color}">${value}</span></div>`;
 }
-function renderDashboard(d, a, rb, acct, total) {
+function renderDashboard(d, acct, total) {
   const ex = accountExposure(d), balances = accountBalances(d), all = analyze(d), lifetime = periodPerformance(d,{from:-Infinity,to:Infinity});
   const lev = ex.leverage == null ? 'N/A' : ex.leverage.toFixed(2)+'×';
   const margin = ex.usage == null ? 'N/A' : fmtPct(ex.usage,2);
@@ -64,11 +64,6 @@ function renderDashboard(d, a, rb, acct, total) {
     sideRow('All-time PnL',fmtUsd(lifetime.total,{sign:true,compact:true}),cls(lifetime.total),'Perps PnL from portfolio history, net of transfers'),
     sideRow('Volume',fmtUsd(all.totalVol)),sideRow('Open notional',fmtUsd(ex.notional,{compact:true,dec:0})),
   ].join('');
-  const durations = all.trades.filter(t=>!t.partial).map(t=>t.close-t.open).sort((a,b)=>a-b), mid = Math.floor(durations.length/2);
-  const median = durations.length ? (durations[mid]+durations[Math.floor((durations.length-1)/2)])/2 : null;
-  $('#sidebar-analysis').innerHTML = [sideRow('Longest win streak',all.maxW+' trades'),sideRow('Avg trade duration',all.avgHold == null ? '–' : fmtDur(all.avgHold)),sideRow('Median duration',median == null ? '–' : fmtDur(median),'','Median of fully observed closed trades'),sideRow('Profit factor',all.profitFactor == null ? '–' : all.profitFactor === Infinity ? '∞' : all.profitFactor.toFixed(2),all.profitFactor >= 1 ? 'pos' : ''),sideRow('Expectancy',fmtUsd(all.expectancy,{sign:true}),cls(all.expectancy))].join('');
-  $('#sidebar-period').textContent = rb.label;
-  $('#sidebar-performance').innerHTML = [sideRow('Drawdown',fmtUsd(-a.mdd),'neg','Maximum drawdown on the realized PnL curve in this period'),sideRow('Win rate',a.winRate == null ? '–' : fmtPct(a.winRate),'pos'),sideRow('Largest win',fmtUsd(a.largestWin,{sign:true}),'pos'),sideRow('Largest loss',fmtUsd(a.largestLoss,{sign:true}),'neg'),sideRow('Closed trades',a.count)].join('');
   renderPerformanceCard();
   renderPortfolioChart();
   renderAccountTables(d,acct,total);
