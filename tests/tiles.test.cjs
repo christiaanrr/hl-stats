@@ -51,17 +51,16 @@ test('all time uses the lifetime history; ranges before coverage never assume ze
   }
   assert.equal(setup({portfolio:{}}).render().tiles[1].includes('Unavailable'),true);
 });
-test('four period tiles reconcile and share the selected net-deposit denominator',()=>{
+test('three period tiles share the selected net-deposit denominator',()=>{
   const {render}=setup();
   const {tiles,now}=render();
-  assert.equal(tiles.length,4);
+  assert.equal(tiles.length,3);
   assert.ok(tiles[0].includes('+$80.00'));
-  assert.ok(tiles[1].includes('+$70.00'));
-  assert.ok(tiles[2].includes('+$150.00'));
-  assert.ok(tiles[3].includes('+$300.00'));
+  assert.ok(tiles[1].includes('+$150.00'));
+  assert.ok(tiles[2].includes('+$300.00'));
   assert.ok(tiles[0].includes('+26.7%'));
-  assert.ok(tiles[1].includes('+23.3%'));
-  assert.ok(tiles[2].includes('+50.0%'));
+  assert.ok(tiles[1].includes('+50.0%'));
+  assert.ok(!tiles.join('').includes('unrealized'));
   assert.ok(now.includes('Account value · now'));
   assert.ok(now.includes('+$40.00'));
   assert.ok(!now.includes('%'));
@@ -70,31 +69,30 @@ test('changing dates updates period totals and deposits while live balances stay
   const {render}=setup();
   const before=render(),after=render(10,20,30);
   assert.ok(after.tiles[0].includes('+$30.00'));
-  assert.ok(after.tiles[1].includes('+$70.00'));
-  assert.ok(after.tiles[2].includes('+$100.00'));
-  assert.ok(after.tiles[3].includes('−$200.00'));
+  assert.ok(after.tiles[1].includes('+$100.00'));
+  assert.ok(after.tiles[2].includes('−$200.00'));
   assert.ok(after.tiles[0].includes('N/A'));
   assert.equal(after.now,before.now);
 });
-test('closing a profitable position can reduce unrealized PnL without being a loss',()=>{
+test('total PnL comes from portfolio history independently of realized PnL',()=>{
   const {render}=setup();
   const {tiles}=render(10,20,180);
   assert.ok(tiles[0].includes('+$180.00'));
-  assert.ok(tiles[1].includes('−$80.00'));
-  assert.ok(tiles[2].includes('+$100.00'));
+  assert.ok(tiles[1].includes('+$100.00'));
 });
 test('missing/unpriced deposits suppress percentages, not profit amounts',()=>{
   for (const ledger of [null,[],[{time:9,delta:{type:'send',user:'other',destination:'0xabc',token:'HYPE',amount:'2'}}]]) {
     const {tiles}=setup({ledger}).render();
-    assert.ok(tiles.slice(0,3).every(tile=>tile.includes('N/A')));
+    assert.ok(tiles.slice(0,2).every(tile=>tile.includes('N/A')));
     assert.ok(tiles[0].includes('+$80.00'));
   }
 });
-test('incomplete fills or activity newer than snapshots cannot produce unrealized change',()=>{
-  for (const overrides of [{fills:Array.from({length:10000},()=>({time:1}))},{funding:[{time:21}]}]) {
-    const {tiles}=setup(overrides).render(5,Infinity);
-    assert.ok(tiles[1].includes('Unavailable'));
-    assert.ok(tiles[2].includes('+$150.00'));
+test('incomplete fills and newer activity retain history warnings without changing total PnL',()=>{
+  for (const [overrides,warning] of [[{fills:Array.from({length:10000},()=>({time:1}))},'10,000-fill limit'],[{funding:[{time:21}]},'newer than the latest total PnL snapshot']]) {
+    const {tiles,note}=setup(overrides).render(5,Infinity);
+    assert.ok(tiles[1].includes('+$150.00'));
+    assert.ok(note.includes(warning));
+    assert.ok(!note.includes('unrealized'));
   }
 });
 

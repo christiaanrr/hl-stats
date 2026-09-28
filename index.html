@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#141310">
 <title>Hyperliquid Stats</title>
-<link rel="stylesheet" href="dashboard.css?v=20260928-timestamp">
+<link rel="stylesheet" href="dashboard.css?v=20260928-period-summary">
 </head>
 <body>
 <div class="dashboard wrap">
@@ -455,11 +455,9 @@ function renderSummary(d, a, rb, acct, totalAccount) {
   const realized = a.realizedNet+a.fundNet, performance = periodPerformance(d, rb);
   let flows = null;
   try { if (Array.isArray(d.ledger)) flows = cashflows(d.ledger, user, rb.from, rb.to); } catch {}
-  // The API exposes at most 10,000 fills; incomplete realized history cannot
-  // support a reliable decomposition of total PnL into realized/unrealized.
+  // The API exposes at most 10,000 fills, so realized history may be incomplete.
   const limitedFills = d.fills.length >= 10000;
   const newerActivity = performance.total != null && [...d.fills, ...d.funding].some(e => e.time > performance.to && e.time <= rb.to && e.time >= rb.from);
-  const unrealizedChange = performance.total == null || limitedFills || newerActivity ? null : performance.total-realized;
   const pct = value => {
     if (value == null) return '';
     if (!flows || flows.unpriced || flows.net <= 0) return '<span class="tile-ratio" title="A positive, fully priced net-deposit total is needed">% of period net deposits: N/A</span>';
@@ -470,14 +468,13 @@ function renderSummary(d, a, rb, acct, totalAccount) {
   $('#period-label').textContent = rb.label;
   $('#tiles').innerHTML = [
     tile('Realized PnL', amount(realized), `${pct(realized)}after fees and funding · ${a.count} trade${a.count === 1 ? '' : 's'}${winRate}`, cls(realized)),
-    tile('Change in unrealized PnL', amount(unrealizedChange), `${pct(unrealizedChange)}${unrealizedChange == null ? 'Historical change cannot be calculated for this range' : 'open profit at end minus start'}`, cls(unrealizedChange)),
-    tile('Total PnL', amount(performance.total), `${pct(performance.total)}${performance.total == null ? esc(performance.reason) : 'realized PnL + change in unrealized PnL'}`, cls(performance.total)),
+    tile('Total PnL', amount(performance.total), `${pct(performance.total)}${performance.total == null ? esc(performance.reason) : 'Period PnL, excluding deposits and withdrawals'}`, cls(performance.total)),
     tile('Net deposits', flows && !flows.unpriced ? amount(flows.net) : 'Unavailable', flows && !flows.unpriced ? `${fmtUsd(flows.deposits)} in − ${fmtUsd(flows.withdrawals)} out` : 'Complete USD deposit history is needed'),
   ].join('');
-  const notes = [performance.total == null ? performance.reason : 'Unrealized change is estimated from total PnL minus realized PnL; it can differ slightly from live position data.'];
+  const notes = performance.total == null ? [performance.reason] : [];
   if (performance.interpolated) notes.push('Period boundaries are estimated between historical snapshots.');
-  if (limitedFills) notes.push('Realized PnL uses the available trade history; the API’s 10,000-fill limit prevents a reliable unrealized-change estimate.');
-  if (newerActivity) notes.push('Trading activity is newer than the latest PnL snapshot. Refresh shortly for the unrealized change.');
+  if (limitedFills) notes.push('Realized PnL uses the available trade history, which may be incomplete because of the API’s 10,000-fill limit.');
+  if (newerActivity) notes.push('Realized PnL includes activity newer than the latest total PnL snapshot.');
   notes.push('Percentages compare PnL with net deposits in this period, not an investment return.');
   $('#period-note').textContent = notes.join(' ');
   $('#now-tiles').innerHTML = [
