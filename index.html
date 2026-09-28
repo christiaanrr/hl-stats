@@ -41,6 +41,12 @@
       <div id="chart-calendar" class="chart-calendar" role="tabpanel" aria-labelledby="chart-tab-calendar" hidden><div id="hero-calendar"></div></div>
     </section>
 
+    <div class="analytics" id="analytics">
+      <section class="summary-section" aria-labelledby="period-heading"><h2 class="summary-heading" id="period-heading">Selected-period perps performance <small id="period-label"></small></h2><div class="grid tiles" id="tiles"></div></section>
+      <section class="card"><h2><span>PnL calendar <span id="cal-month" class="badge"></span></span><small id="cal-sub">Closed trades per day, net of fees</small></h2><div id="calendar"></div></section>
+      <section class="grid two"><div class="card"><h2>Trade quality <small id="tq-sub"></small></h2><div class="stats" id="quality"></div></div><div class="card"><h2>PnL by coin <small>Top 5 winners and losers, net of fees</small></h2><div class="chart" id="bycoin"></div></div></section>
+      <section class="grid two"><div class="card"><h2>Distribution of trade outcomes <small>Net PnL per closed trade</small></h2><div class="chart" id="hist"></div></div><div class="card"><h2>Costs &amp; activity <small>In selected range</small></h2><div class="stats" id="fees"></div></div></section>
+    </div>
     <section class="panel positions-panel" id="positions-section" aria-label="Account tables">
       <div class="tabs table-tabs" id="table-tabs" role="tablist" aria-label="Account details"><button id="tab-positions" role="tab" aria-selected="true" aria-controls="panel-positions" data-table="positions">Positions <span class="count" id="position-count">0</span></button><button id="tab-balances" role="tab" aria-selected="false" aria-controls="panel-balances" data-table="balances" tabindex="-1">Balances</button><button id="tab-orders" role="tab" aria-selected="false" aria-controls="panel-orders" data-table="orders" tabindex="-1">Orders <span class="count" id="order-count">–</span></button><button id="tab-fills" role="tab" aria-selected="false" aria-controls="panel-fills" data-table="fills" tabindex="-1">Fills</button><button id="tab-trades" role="tab" aria-selected="false" aria-controls="panel-trades" data-table="trades" tabindex="-1">Trades</button><button id="tab-transfers" role="tab" aria-selected="false" aria-controls="panel-transfers" data-table="transfers" tabindex="-1">Transfers</button><button id="tab-performance" role="tab" aria-selected="false" aria-controls="panel-performance" data-table="performance" tabindex="-1">Performance</button></div>
       <div id="panel-positions" role="tabpanel" aria-labelledby="tab-positions"><div class="table-caption"><span>Open positions · current snapshot</span><span id="pos-sub"></span></div><div class="table-panel"><div class="tbl" id="positions"></div></div></div>
@@ -52,13 +58,7 @@
       <div id="panel-performance" role="tabpanel" aria-labelledby="tab-performance" hidden><div class="table-caption">Per-coin breakdown · selected date range · click a column to sort</div><div class="table-panel tbl" id="cointable"></div></div>
     </section>
 
-    <div class="analytics" id="analytics">
-      <section class="summary-section" aria-labelledby="period-heading"><h2 class="summary-heading" id="period-heading">Selected-period perps performance <small id="period-label"></small></h2><div class="grid tiles" id="tiles"></div></section>
-      <section class="card cashflow-card"><h2>Deposits &amp; withdrawals <small id="cashflow-sub">in selected range</small></h2><div id="cashflow"><div class="empty">Loading deposit and withdrawal history…</div></div></section>
-      <section class="card"><h2><span>PnL calendar <span id="cal-month" class="badge"></span></span><small id="cal-sub">Closed trades per day, net of fees</small></h2><div id="calendar"></div></section>
-      <section class="grid two"><div class="card"><h2>Trade quality <small id="tq-sub"></small></h2><div class="stats" id="quality"></div></div><div class="card"><h2>PnL by coin <small>Top 5 winners and losers, net of fees</small></h2><div class="chart" id="bycoin"></div></div></section>
-      <section class="grid two"><div class="card"><h2>Distribution of trade outcomes <small>Net PnL per closed trade</small></h2><div class="chart" id="hist"></div></div><div class="card"><h2>Costs &amp; activity <small>In selected range</small></h2><div class="stats" id="fees"></div></div></section>
-    </div>
+    <section class="card cashflow-card"><h2>Deposits &amp; withdrawals <small id="cashflow-sub">in selected range</small></h2><div id="cashflow"><div class="empty">Loading deposit and withdrawal history…</div></div></section>
     <footer>Data from the public Hyperliquid API. Closed-trade stats group fills into round trips per coin (open to flat) and are computed only from fills, fees and funding, so deposits and withdrawals never affect them. Selected-period total PnL comes from Hyperliquid's portfolio history, net of transfers. The account overview always shows current balances. <span id="period-note"></span></footer>
   </main>
 
