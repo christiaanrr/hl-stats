@@ -149,15 +149,17 @@ async function loadLedger() {
   throw new Error('Ledger history exceeds pagination limit');
 }
 async function loadAll() {
-  const [state, portfolio, fills, funding, ledger, orders] = await Promise.all([
+  const [state, portfolio, fills, funding, ledger, orders, abstraction, spotState] = await Promise.all([
     info({type:'clearinghouseState', user}),
     info({type:'portfolio', user}),
     paged('userFillsByTime', 2000, f => f.tid),
     paged('userFunding', 500, f => f.time + ':' + f.delta.coin),
     loadLedger().catch(() => null), // A ledger outage must not hide the trading dashboard.
     info({type:'frontendOpenOrders', user}).catch(() => null),
+    info({type:'userAbstraction', user}).catch(() => null),
+    info({type:'spotClearinghouseState', user}).catch(() => null),
   ]);
-  return {ts: Date.now(), state, portfolio: Object.fromEntries(portfolio), fills, funding, ledger, orders};
+  return {ts: Date.now(), state, portfolio: Object.fromEntries(portfolio), fills, funding, ledger, orders, abstraction, spotState};
 }
 
 /* ---------- analytics ---------- */
@@ -424,7 +426,36 @@ function periodPerformance(d, bounds, scope = 'perps', metric = 'pnl') {
   return {total, points, from, to, interpolated, reason:''};
 }
 
+function accountBalances(d) {
+  const number = v => v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v);
+  const unified = d.abstraction === 'unifiedAccount';
+  const standard = ['disabled','default','dexAbstraction'].includes(d.abstraction);
+  const balances = Array.isArray(d.spotState?.balances) ? d.spotState.balances : null;
+  const usdc = balances?.find(b => b.token === 0);
+  // Unified balances and holds live in spotClearinghouseState. The legacy perps
+  // accountValue is not its equity; adding it (or unrealized PnL) double counts.
+  // https://hyperliquid.gitbook.io/hyperliquid-docs/trading/account-abstraction-modes
+  const equity = unified ? (balances ? (usdc ? number(usdc.total) : 0) : null)
+    : standard ? number(d.state.marginSummary?.accountValue) : null;
+  const used = unified ? (balances ? (usdc ? number(usdc.hold) : 0) : null)
+    : standard ? number(d.state.marginSummary?.totalMarginUsed) : null;
+  const free = equity == null || used == null ? null : Math.max(0,equity-used);
+  const snapshotTotal = number(d.portfolio?.allTime?.accountValueHistory?.at(-1)?.[1]);
+  const onlyUsdc = balances && balances.every(b => b.token === 0 || number(b.total) === 0);
+  const total = unified && onlyUsdc ? equity : snapshotTotal ?? (standard ? equity : null);
+  const spot = equity == null || total == null ? null : Math.max(0,total-equity);
+  return {unified, equity, used, free, total, spot,
+    equityLabel:unified ? 'Unified USDC balance' : standard ? 'Perps balance' : 'Trading collateral',
+    equityNote:unified ? 'Shared by USDC perps and spot; includes unrealized PnL' : standard ? '' : 'Account mode or collateral data unavailable',
+    spotLabel:unified ? 'Other spot assets' : 'Spot balance',
+    spotNote:unified && onlyUsdc ? 'No other spot assets' : 'Estimated from the latest combined portfolio snapshot',
+    usedLabel:unified ? 'USDC held' : 'Margin in use',
+    usedNote:unified ? 'Includes positions and open orders sharing USDC collateral' : 'Initial margin for open positions',
+    withdrawable:standard ? number(d.state.withdrawable) : null};
+}
+
 function renderSummary(d, a, rb, acct, totalAccount) {
+  const balances = accountBalances(d);
   const realized = a.realizedNet+a.fundNet, performance = periodPerformance(d, rb);
   let flows = null;
   try { if (Array.isArray(d.ledger)) flows = cashflows(d.ledger, user, rb.from, rb.to); } catch {}
@@ -454,19 +485,18 @@ function renderSummary(d, a, rb, acct, totalAccount) {
   notes.push('Percentages compare PnL with net deposits in this period, not an investment return.');
   $('#period-note').textContent = notes.join(' ');
   $('#now-tiles').innerHTML = [
-    tile('Account value · now', fmtUsd(totalAccount), `<div class="balance-breakdown"><div><span>Perps balance</span><strong>${fmtUsd(acct)}</strong></div><div><span>Spot balance</span><strong>${fmtUsd(Math.max(0,totalAccount-acct))}</strong></div><div><span>Margin in use</span><strong>${fmtUsd(n(d.state.marginSummary.totalMarginUsed))}</strong></div></div>`),
+    tile('Account value · now', fmtUsd(totalAccount), `<div class="balance-breakdown"><div title="${esc(balances.equityNote)}"><span>${balances.equityLabel}</span><strong>${fmtUsd(acct)}</strong></div><div title="${esc(balances.spotNote)}"><span>${balances.spotLabel}</span><strong>${fmtUsd(balances.spot)}</strong></div><div title="${esc(balances.usedNote)}"><span>${balances.usedLabel}</span><strong>${fmtUsd(balances.used)}</strong></div></div>`),
     tile('Unrealized PnL · open now', fmtUsd(a.unrealized,{sign:true}), `${d.state.assetPositions.length} open position${d.state.assetPositions.length === 1 ? '' : 's'} at current mark<br>Current snapshot · not affected by the date filter`, cls(a.unrealized)),
   ].join('');
 }
 
 function render() {
-  const d = DATA, a = A, p = d.portfolio, ms = d.state.marginSummary;
+  const d = DATA, a = A, balances = accountBalances(d);
   const rb = rangeBounds();
   syncFilters();
   const netInRange = a.realizedNet + a.fundNet;
   $('#range-sum').innerHTML = `<b>${rb.label}</b> · ${a.count} closed trade${a.count === 1 ? '' : 's'} · <span class="${cls(netInRange)}">${fmtUsd(netInRange, {sign: true})}</span> realized after fees and funding`;
-  const acct = n(ms.accountValue);                                   // perp account (capital at risk)
-  const total = n(p.allTime?.accountValueHistory?.at(-1)?.[1]) || acct;  // perp + spot, Hyperliquid's own total
+  const acct = balances.equity, total = balances.total;
   renderSummary(d, a, rb, acct, total);
 
   // Chart tabs share the same date boundaries as the preserved analytics.

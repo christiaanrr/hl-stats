@@ -4,14 +4,15 @@ let POSITION_SORT = {key:'value', direction:-1}, SHOW_ALL_FILLS = false, ACTIVIT
 let toastTimer;
 const clampPercent = value => Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
 
-function accountExposure(state) {
+function accountExposure(d) {
+  const state = d.state, balances = accountBalances(d);
   const positions = (state.assetPositions || []).map(p => p.position).filter(p => n(p.szi) !== 0);
-  const equity = n(state.marginSummary?.accountValue), used = n(state.marginSummary?.totalMarginUsed);
+  const {equity, used, free} = balances;
   let long = 0, short = 0;
   for (const p of positions) { const value = Math.abs(n(p.positionValue)); if (n(p.szi) > 0) long += value; else short += value; }
   const notional = long + short;
-  return {positions, equity, used, free:Math.max(0,equity-used), long, short, notional,
-    leverage:equity > 0 ? notional/equity : null, usage:equity > 0 ? used/equity : null,
+  return {positions, equity, used, free, long, short, notional,
+    leverage:equity > 0 ? notional/equity : null, usage:equity > 0 && used != null ? used/equity : null,
     longShare:notional > 0 ? long/notional : null};
 }
 function compactSize(value) {
@@ -48,18 +49,20 @@ function sideRow(key, value, color = '', title = '') {
   return `<div class="side-row"${title ? ` title="${esc(title)}"` : ''}><span class="key">${key}</span><span class="val ${color}">${value}</span></div>`;
 }
 function renderDashboard(d, a, rb, acct, total) {
-  const ex = accountExposure(d.state), all = analyze(d), lifetime = periodPerformance(d,{from:-Infinity,to:Infinity});
+  const ex = accountExposure(d), balances = accountBalances(d), all = analyze(d), lifetime = periodPerformance(d,{from:-Infinity,to:Infinity});
   const lev = ex.leverage == null ? 'N/A' : ex.leverage.toFixed(2)+'×';
   const margin = ex.usage == null ? 'N/A' : fmtPct(ex.usage,2);
-  $('#leverage-card').innerHTML = `<div class="metric-value warn">${lev}</div><div class="meter gold" title="Gross notional / perps equity. Bar scale: 0–5×."><span style="width:${clampPercent(ex.leverage/5*100)}%"></span></div><div class="metric-caption"><span class="warn">${fmtUsd(ex.notional,{compact:true,dec:0})} Notional</span> · ${fmtUsd(acct,{compact:true,dec:0})} Perps equity</div>`;
-  $('#margin-card').innerHTML = `<div class="metric-value ${ex.usage >= .8 ? 'neg' : 'pos'}">${margin}</div><div class="meter" title="Margin used / perps equity"><span style="width:${clampPercent(ex.usage*100)}%;background:var(--${ex.usage >= .8 ? 'bad' : 'good'})"></span></div><div class="metric-caption"><span class="${ex.usage >= .8 ? 'neg' : 'pos'}">${fmtUsd(ex.free)} Free</span> · ${fmtUsd(ex.used,{compact:true,dec:0})} in use</div>`;
+  const equityLabel = balances.unified ? 'Unified USDC' : 'Perps equity';
+  const leverageNote = `Open Hyperliquid perps notional / ${equityLabel.toLowerCase()}. Bar scale: 0–5×.`;
+  $('#leverage-card').innerHTML = `<div class="metric-value warn">${lev}</div><div class="meter gold" title="${leverageNote}"><span style="width:${clampPercent(ex.leverage/5*100)}%"></span></div><div class="metric-caption"><span class="warn">${fmtUsd(ex.notional,{compact:true,dec:0})} Notional</span> · ${fmtUsd(acct,{compact:true,dec:0})} ${equityLabel}</div>`;
+  $('#margin-card').innerHTML = `<div class="metric-value ${ex.usage == null ? '' : ex.usage >= .8 ? 'neg' : 'pos'}">${margin}</div><div class="meter" title="${balances.usedLabel} / ${equityLabel.toLowerCase()}. ${balances.usedNote}"><span style="width:${clampPercent(ex.usage*100)}%;background:var(--${ex.usage >= .8 ? 'bad' : 'good'})"></span></div><div class="metric-caption"><span class="${ex.usage == null ? '' : ex.usage >= .8 ? 'neg' : 'pos'}">${fmtUsd(ex.free)} Free</span> · ${fmtUsd(ex.used,{compact:true,dec:0})} ${balances.unified ? 'held' : 'in use'}</div>`;
   const ls = ex.longShare, ss = ls == null ? null : 1-ls;
   const bias = ls == null ? 'No open exposure' : ls === 1 ? 'Long only ↗' : ls === 0 ? 'Short only ↘' : ls > .6 ? 'Long biased ↗' : ls < .4 ? 'Short biased ↘' : 'Balanced ⇄';
   $('#direction-card').innerHTML = `<div class="metric-value ${ls == null ? '' : ls >= .5 ? 'pos' : 'neg'}" title="Direction of open positions, weighted by notional value">${bias}</div><div class="meter direction"><span style="width:${clampPercent(ls*100)}%"></span><span style="width:${clampPercent(ss*100)}%"></span></div><div class="metric-caption split"><span><span class="pos">${ls == null ? '–' : fmtPct(ls,0)}</span> · Long ${fmtUsd(ex.long,{compact:true,dec:0})}</span><span>${fmtUsd(ex.short,{compact:true,dec:0})} Short · <span class="neg">${ss == null ? '–' : fmtPct(ss,0)}</span></span></div>`;
   $('#side-margin').innerHTML = margin;
   $('#side-margin-bar').style.width = clampPercent(ex.usage*100)+'%';
   $('#sidebar-overview').innerHTML = [
-    sideRow('Account leverage',lev),sideRow('Margin usage',margin,ex.usage >= .8 ? 'neg' : ''),
+    sideRow('Account leverage',lev,'',leverageNote),sideRow('Margin usage',margin,ex.usage >= .8 ? 'neg' : '',balances.usedNote),
     sideRow('All-time PnL',fmtUsd(lifetime.total,{sign:true,compact:true}),cls(lifetime.total),'Perps PnL from portfolio history, net of transfers'),
     sideRow('Volume',fmtUsd(all.totalVol)),sideRow('Open notional',fmtUsd(ex.notional,{compact:true,dec:0})),
   ].join('');
@@ -129,7 +132,7 @@ function drawPortfolioChart(container, history, signed) {
   hit.addEventListener('pointerleave',()=>{cross.setAttribute('opacity',0);dot.setAttribute('opacity',0);hideTip();});
 }
 function renderOpenPositions() {
-  const ex=accountExposure(DATA.state);
+  const ex=accountExposure(DATA);
   const ps=ex.positions.map(p=>({...p,size:Math.abs(n(p.szi)),value:Math.abs(n(p.positionValue)),entry:n(p.entryPx),mark:Math.abs(n(p.szi))?Math.abs(n(p.positionValue)/n(p.szi)):0,pnl:n(p.unrealizedPnl),liq:p.liquidationPx==null?null:n(p.liquidationPx),margin:n(p.marginUsed),funding:-n(p.cumFunding?.sinceOpen)}));
   ps.sort((a,b)=>{const av=a[POSITION_SORT.key],bv=b[POSITION_SORT.key];if(av==null)return 1;if(bv==null)return -1;return(typeof av==='string'?av.localeCompare(bv):av-bv)*POSITION_SORT.direction;});
   $('#position-count').textContent=ps.length;
@@ -142,7 +145,8 @@ function renderOpenPositions() {
   $('#positions').querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{if(POSITION_SORT.key===b.dataset.sort)POSITION_SORT.direction*=-1;else POSITION_SORT={key:b.dataset.sort,direction:b.dataset.sort==='coin'?1:-1};renderOpenPositions();});
 }
 function renderAccountTables(d,acct,total) {
-  $('#balances').innerHTML=`<div class="stats">${stat('Perps balance',fmtUsd(acct))}${stat('Spot balance',fmtUsd(Math.max(0,total-acct)),'Derived from the latest combined portfolio snapshot')}${stat('Total account value',fmtUsd(total))}${stat('Margin in use',fmtUsd(n(d.state.marginSummary.totalMarginUsed)))}${stat('Available margin',fmtUsd(Math.max(0,acct-n(d.state.marginSummary.totalMarginUsed))))}${stat('Withdrawable',d.state.withdrawable==null?'Unavailable':fmtUsd(n(d.state.withdrawable)))}</div>`;
+  const b=accountBalances(d);
+  $('#balances').innerHTML=`<div class="stats">${stat(b.equityLabel,fmtUsd(acct),b.equityNote)}${stat(b.spotLabel,fmtUsd(b.spot),b.spotNote)}${stat('Total account value',fmtUsd(total))}${stat(b.usedLabel,fmtUsd(b.used),b.usedNote)}${stat('Available margin',fmtUsd(b.free))}${stat('Withdrawable',b.withdrawable==null?'Unavailable':fmtUsd(b.withdrawable),b.unified?'Not provided for unified accounts':'')}</div>`;
   $('#order-count').textContent=Array.isArray(d.orders)?d.orders.length:'–';
   $('#orders').innerHTML=!Array.isArray(d.orders)?'<div class="empty">Open orders are unavailable. Refresh to try again.</div>':!d.orders.length?'<div class="empty">No open orders.</div>':`<table><thead><tr><th>Asset</th><th>Side</th><th>Size</th><th>Limit price</th><th>Type</th><th>Trigger</th><th>Reduce only</th></tr></thead><tbody>${d.orders.map(o=>`<tr><td><span class="asset-cell">${coinIcon(o.coin)}${esc(o.coin)}</span></td><td class="${o.side==='B'?'pos':'neg'}">${o.side==='B'?'Buy':'Sell'}</td><td>${o.isPositionTpsl && n(o.sz)===0 ? 'Full position' : fmtNum(n(o.sz),6)}</td><td>${fmtNum(n(o.limitPx),6)}</td><td>${esc(o.orderType||'Limit')}</td><td>${esc(o.triggerCondition||'–')}</td><td>${o.reduceOnly?'Yes':'No'}</td></tr>`).join('')}</tbody></table>`;
   const rb=rangeBounds(),fills=d.fills.filter(f=>f.time>=rb.from&&f.time<=rb.to).slice().reverse(),shown=SHOW_ALL_FILLS?fills:fills.slice(0,40);
