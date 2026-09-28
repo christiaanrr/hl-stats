@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#141310">
 <title>Hyperliquid Stats</title>
-<link rel="stylesheet" href="dashboard.css?v=20260928-header">
+<link rel="stylesheet" href="dashboard.css?v=20260928-sidebar">
 </head>
 <body>
 <div class="dashboard wrap">
@@ -20,7 +20,6 @@
       <div class="profile-actions"><button id="refresh">↻ Refresh</button><a id="explorer-link" href="https://app.hyperliquid.xyz/explorer" target="_blank" rel="noopener noreferrer">↗ Explorer</a></div>
       <div class="update-line"><span id="updated">loading…</span><a class="tiny-link" href="#analytics">All metrics ↓</a></div>
     </div>
-    <div id="margin-alert" class="margin-card"><span class="eyebrow">Margin utilization</span><div class="risk-value" id="side-margin">–</div><div class="meter"><span id="side-margin-bar" style="width:0"></span></div><a href="#positions-section" id="view-positions">View open positions</a></div>
     <section class="summary-section" aria-label="Current account overview"><div class="account-overview" id="now-tiles"></div></section>
     <section class="side-section"><h2>Overview <small>current account</small></h2><div id="sidebar-overview"></div></section>
     <section class="side-section analysis-section"><h2>Analysis <small>all time</small></h2><div id="sidebar-analysis"></div></section>
@@ -75,7 +74,7 @@
   <aside class="panel activity-panel" aria-label="Recent activity"><div class="panel-head"><h2>Recent Activity</h2><span id="activity-status" class="activity-status">LOADING</span></div><div class="activity-feed" id="activity-feed"><div class="empty">Loading recent activity…</div></div><div class="activity-footer" id="activity-footer">Latest fills and transfers · local time</div></aside>
 </div>
 <div class="tip" id="tip" role="tooltip"></div><div class="toast" id="toast" role="status" hidden></div>
-<script src="dashboard.js?v=20260928-header"></script>
+<script src="dashboard.js?v=20260928-sidebar"></script>
 
 <script>
 /* ---------- config ---------- */
@@ -633,7 +632,7 @@ function askForWallet(msg) {
   $('#refresh').hidden = true;
   const s = $('#status'); s.hidden = false; s.className = 'status load';
   s.innerHTML = `<form id="wallet-form" class="wallet-form"><label for="wallet">${msg}</label><input id="wallet" placeholder="0x…" autocomplete="off" spellcheck="false"><button type="submit">Open dashboard</button></form>`;
-  document.querySelectorAll('.overview-grid, .chart-panel, .positions-panel, .analytics, .activity-panel, .summary-section, .side-section, .margin-card, footer').forEach(el => el.hidden = true);
+  document.querySelectorAll('.overview-grid, .chart-panel, .positions-panel, .analytics, .activity-panel, .summary-section, .side-section, footer').forEach(el => el.hidden = true);
   $('#wallet-form').onsubmit = e => { e.preventDefault(); const v = $('#wallet').value.trim(); if (/^0x[0-9a-fA-F]{40}$/.test(v)) location.search = '?user=' + v; else { $('#wallet').style.borderColor = 'var(--bad)'; $('#wallet').setAttribute('aria-invalid','true'); } };
 }
 if (!user) askForWallet('Enter a Hyperliquid wallet address to view its stats.');

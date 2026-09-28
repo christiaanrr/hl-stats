@@ -59,8 +59,6 @@ function renderDashboard(d, a, rb, acct, total) {
   const ls = ex.longShare, ss = ls == null ? null : 1-ls;
   const bias = ls == null ? 'No open exposure' : ls === 1 ? 'Long only ↗' : ls === 0 ? 'Short only ↘' : ls > .6 ? 'Long biased ↗' : ls < .4 ? 'Short biased ↘' : 'Balanced ⇄';
   $('#direction-card').innerHTML = `<div class="metric-value ${ls == null ? '' : ls >= .5 ? 'pos' : 'neg'}" title="Direction of open positions, weighted by notional value">${bias}</div><div class="meter direction"><span style="width:${clampPercent(ls*100)}%"></span><span style="width:${clampPercent(ss*100)}%"></span></div><div class="metric-caption split"><span><span class="pos">${ls == null ? '–' : fmtPct(ls,0)}</span> · Long ${fmtUsd(ex.long,{compact:true,dec:0})}</span><span>${fmtUsd(ex.short,{compact:true,dec:0})} Short · <span class="neg">${ss == null ? '–' : fmtPct(ss,0)}</span></span></div>`;
-  $('#side-margin').innerHTML = margin;
-  $('#side-margin-bar').style.width = clampPercent(ex.usage*100)+'%';
   $('#sidebar-overview').innerHTML = [
     sideRow('Account leverage',lev,'',leverageNote),sideRow('Margin usage',margin,ex.usage >= .8 ? 'neg' : '',balances.usedNote),
     sideRow('All-time PnL',fmtUsd(lifetime.total,{sign:true,compact:true}),cls(lifetime.total),'Perps PnL from portfolio history, net of transfers'),
@@ -200,7 +198,6 @@ function initDashboard() {
   $('#performance-range').onchange=renderPerformanceCard;
   if(!SINCE)$('#performance-range option[value="since"]').remove();
   $('#table-tabs').onclick=e=>{const b=e.target.closest('[data-table]');if(b)selectTable(b.dataset.table);};
-  $('#view-positions').onclick=()=>selectTable('positions');
   $('#chart-tabs').onclick=e=>{const b=e.target.closest('[data-chart]');if(!b)return;CHART_VIEW=b.dataset.chart;document.querySelectorAll('[data-chart]').forEach(t=>{const selected=t===b;t.setAttribute('aria-selected',String(selected));t.tabIndex=selected?0:-1;});renderPortfolioChart();};
   document.querySelectorAll('[data-metric]').forEach(b=>b.onclick=()=>{CHART_METRIC=b.dataset.metric;renderPortfolioChart();});
   document.querySelectorAll('[role="tablist"]').forEach(list=>list.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const tabs=[...list.querySelectorAll('[role="tab"]')],i=tabs.indexOf(document.activeElement);if(i<0)return;e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;tabs[next].click();tabs[next].focus();}));
